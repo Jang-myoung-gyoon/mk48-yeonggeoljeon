@@ -64,7 +64,7 @@ enum EventConditionType {
   capturePointControlled,
 }
 
-enum EventRewardType { experience, morale, item, branch }
+enum EventRewardType { experience, morale, item, branch, defeatUnit }
 
 extension TerrainTypeUi on TerrainType {
   String get label => switch (this) {

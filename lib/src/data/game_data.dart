@@ -404,6 +404,7 @@ List<StageDefinition> _buildStages(List<OfficerProfile> roster) {
     required List<UnitPlacement> enemyUnits,
     List<CapturePointDefinition> capturePoints = const [],
     List<EscapeZoneDefinition> escapeZones = const [],
+    List<StageEventDefinition> eventTriggers = const [],
   }) {
     return StageDefinition(
       id: id,
@@ -414,7 +415,7 @@ List<StageDefinition> _buildStages(List<OfficerProfile> roster) {
       objectiveRule: objectiveRule,
       lossCondition: lossCondition,
       lossTriggers: lossTriggers,
-      eventTriggers: const <StageEventDefinition>[],
+      eventTriggers: eventTriggers,
       gimmick: gimmick,
       turnLimit: turnLimit,
       width: 9,
@@ -458,6 +459,23 @@ List<StageDefinition> _buildStages(List<OfficerProfile> roster) {
       targetWinRate: 0.90,
       playerUnits: heroes(),
       enemyUnits: enemies(bossId: 'hua-xiong'),
+      eventTriggers: const [
+        StageEventDefinition(
+          id: 'stage-1-opening-oath',
+          title: '도원의 맹세',
+          timing: StageEventTiming.battleStart,
+          conditions: [],
+          rewards: [
+            EventReward(
+              type: EventRewardType.morale,
+              targetUnitId: 'liu-bei',
+              amount: 10,
+              summary: '도원의 맹세로 전열이 정돈됐다.',
+            ),
+          ],
+          logEntry: '유비, 관우, 장비가 도원의 맹세를 되새기며 첫 전장을 맞이한다.',
+        ),
+      ],
     ),
     stage(
       id: 2,
@@ -493,6 +511,37 @@ List<StageDefinition> _buildStages(List<OfficerProfile> roster) {
         supportB: 'allied-archer',
         supportC: 'yellow-turban-vanguard',
       ),
+      eventTriggers: const [
+        StageEventDefinition(
+          id: 'duel-guan-yu-vs-hua-xiong',
+          title: '관우 vs 화웅',
+          timing: StageEventTiming.duel,
+          duel: true,
+          conditions: [
+            EventCondition(type: EventConditionType.turnAtLeast, turn: 1),
+            EventCondition(
+              type: EventConditionType.unitWithinRange,
+              trackedUnitIds: ['guan-yu', 'hua-xiong'],
+              range: 1,
+            ),
+          ],
+          rewards: [
+            EventReward(type: EventRewardType.defeatUnit, targetUnitId: 'hua-xiong'),
+            EventReward(
+              type: EventRewardType.experience,
+              targetUnitId: 'guan-yu',
+              amount: 80,
+              summary: '관우 경험치 +80',
+            ),
+            EventReward(
+              type: EventRewardType.item,
+              payload: 'azure-spoils',
+              summary: '청룡 전리품 획득',
+            ),
+          ],
+          logEntry: '관우가 화웅에게 일기토를 신청한다.',
+        ),
+      ],
     ),
     stage(
       id: 3,
@@ -528,6 +577,31 @@ List<StageDefinition> _buildStages(List<OfficerProfile> roster) {
         supportB: 'wei-raider',
         supportC: 'wei-guard',
       ),
+      eventTriggers: const [
+        StageEventDefinition(
+          id: 'duel-zhang-fei-vs-lu-bu',
+          title: '장비 vs 여포',
+          timing: StageEventTiming.duel,
+          duel: true,
+          conditions: [
+            EventCondition(type: EventConditionType.turnAtLeast, turn: 1),
+            EventCondition(
+              type: EventConditionType.unitWithinRange,
+              trackedUnitIds: ['zhang-fei', 'lu-bu'],
+              range: 1,
+            ),
+          ],
+          rewards: [
+            EventReward(
+              type: EventRewardType.morale,
+              targetUnitId: 'zhang-fei',
+              amount: 15,
+              summary: '장비 사기 +15',
+            ),
+          ],
+          logEntry: '장비가 여포를 향해 포효하며 일기토를 벌인다.',
+        ),
+      ],
     ),
     stage(
       id: 4,
@@ -701,6 +775,31 @@ List<StageDefinition> _buildStages(List<OfficerProfile> roster) {
         supportB: 'allied-archer',
         supportC: 'wei-guard',
       ),
+      eventTriggers: const [
+        StageEventDefinition(
+          id: 'duel-guan-yu-vs-xiahou-dun',
+          title: '관우 vs 하후돈',
+          timing: StageEventTiming.duel,
+          duel: true,
+          conditions: [
+            EventCondition(type: EventConditionType.turnAtLeast, turn: 2),
+            EventCondition(
+              type: EventConditionType.unitWithinRange,
+              trackedUnitIds: ['guan-yu', 'xiahou-dun'],
+              range: 1,
+            ),
+          ],
+          rewards: [
+            EventReward(
+              type: EventRewardType.experience,
+              targetUnitId: 'guan-yu',
+              amount: 40,
+              summary: '관우 경험치 +40',
+            ),
+          ],
+          logEntry: '관우와 하후돈의 칼끝이 맞부딪힌다.',
+        ),
+      ],
     ),
     stage(
       id: 8,
@@ -785,6 +884,30 @@ List<StageDefinition> _buildStages(List<OfficerProfile> roster) {
         supportB: 'wei-guard',
         supportC: 'wei-raider',
       ),
+      eventTriggers: const [
+        StageEventDefinition(
+          id: 'duel-zhao-yun-vs-zhang-liao',
+          title: '조운 vs 장료',
+          timing: StageEventTiming.duel,
+          duel: true,
+          conditions: [
+            EventCondition(type: EventConditionType.turnAtLeast, turn: 1),
+            EventCondition(
+              type: EventConditionType.unitWithinRange,
+              trackedUnitIds: ['zhao-yun', 'zhang-liao'],
+              range: 1,
+            ),
+          ],
+          rewards: [
+            EventReward(
+              type: EventRewardType.item,
+              payload: 'river-victory-badge',
+              summary: '강변 승전 인장 획득',
+            ),
+          ],
+          logEntry: '조운이 장료를 향해 돌격하며 일기토를 연다.',
+        ),
+      ],
     ),
     stage(
       id: 10,
@@ -832,6 +955,37 @@ List<StageDefinition> _buildStages(List<OfficerProfile> roster) {
           id: 'jing-supply-depot',
           label: '보급고',
           position: GridPoint(6, 5),
+        ),
+      ],
+      eventTriggers: const [
+        StageEventDefinition(
+          id: 'stage-10-secure-jingzhou',
+          title: '형주 거점 확보',
+          timing: StageEventTiming.battleEnd,
+          conditions: [
+            EventCondition(
+              type: EventConditionType.battleOutcomeIs,
+              expectedOutcome: BattleOutcome.victory,
+            ),
+            EventCondition(
+              type: EventConditionType.capturePointControlled,
+              targetPointIds: ['jing-north-gate', 'jing-supply-depot'],
+              controllingFaction: Faction.shu,
+            ),
+          ],
+          rewards: [
+            EventReward(
+              type: EventRewardType.item,
+              payload: '형주 군량 200석',
+              summary: '보상: 형주 군량 200석 확보',
+            ),
+            EventReward(
+              type: EventRewardType.branch,
+              payload: 'jingzhou-secured',
+              summary: '형주 진입 루트가 완전히 개방됐다.',
+            ),
+          ],
+          logEntry: '북문과 보급고가 모두 확보되어 형주 진입이 확정됐다.',
         ),
       ],
     ),

@@ -29,14 +29,37 @@ class BattleEngine {
       triggeredEvents: const <BattleEventRecord>[],
       rewardLog: const <String>[],
     );
-    return resolveState(state);
+    return resolveState(state, timings: const {StageEventTiming.battleStart});
   }
 
-  static BattleState resolveState(BattleState state) {
+  static BattleState resolveState(
+    BattleState state, {
+    Set<StageEventTiming> timings = const {StageEventTiming.duel},
+  }) {
     var resolved = _resolveEscapes(state);
     resolved = _resolveCapturePoints(resolved);
-    final outcome = _evaluateOutcome(resolved);
-    return resolved.copyWith(outcome: outcome);
+    var nextOutcome = resolved.outcome != BattleOutcome.ongoing
+        ? resolved.outcome
+        : _evaluateOutcome(resolved);
+    resolved = resolved.copyWith(outcome: nextOutcome);
+    for (var i = 0; i < 2; i++) {
+      resolved = _resolveEvents(
+        resolved,
+        timings: {
+          ...timings,
+          if (nextOutcome != BattleOutcome.ongoing) StageEventTiming.battleEnd,
+        },
+      );
+      nextOutcome = resolved.outcome != BattleOutcome.ongoing
+          ? resolved.outcome
+          : _evaluateOutcome(resolved);
+      resolved = resolved.copyWith(outcome: nextOutcome);
+    }
+    return resolved.copyWith(
+      outcome: resolved.outcome != BattleOutcome.ongoing
+          ? resolved.outcome
+          : _evaluateOutcome(resolved),
+    );
   }
 
   static BattleOutcome evaluateOutcome(BattleState state) =>
@@ -59,10 +82,7 @@ class BattleEngine {
       unitId,
     ];
     return resolveState(
-      state.copyWith(
-        units: updatedUnits,
-        escapedUnitIds: escapedIds,
-      ),
+      state.copyWith(units: updatedUnits, escapedUnitIds: escapedIds),
     );
   }
 
@@ -679,6 +699,123 @@ class BattleEngine {
     }
 
     return state.copyWith(captureStates: nextStates);
+  }
+
+  static BattleState _resolveEvents(
+    BattleState state, {
+    required Set<StageEventTiming> timings,
+  }) {
+    if (state.stage.eventTriggers.isEmpty) return state;
+
+    var working = state;
+    for (final event in state.stage.eventTriggers) {
+      if (!timings.contains(event.timing)) {
+        continue;
+      }
+      if (event.once && working.hasTriggeredEvent(event.id)) {
+        continue;
+      }
+      if (!_eventConditionsMet(working, event)) {
+        continue;
+      }
+
+      working = _applyEventRewards(working, event.rewards);
+      working = working.copyWith(
+        triggeredEvents: [
+          ...working.triggeredEvents,
+          BattleEventRecord(
+            eventId: event.id,
+            title: event.title,
+            logEntry: event.logEntry,
+            triggeredTurn: working.turn,
+            duel: event.duel,
+          ),
+        ],
+        log: [...working.log, event.logEntry],
+      );
+    }
+    return working;
+  }
+
+  static bool _eventConditionsMet(
+    BattleState state,
+    StageEventDefinition event,
+  ) {
+    return event.conditions.every((condition) {
+      switch (condition.type) {
+        case EventConditionType.turnAtLeast:
+          return state.turn >= (condition.turn ?? 1);
+        case EventConditionType.unitWithinRange:
+          if (condition.trackedUnitIds.length < 2) return false;
+          final first = _resolveUnit(state, condition.trackedUnitIds[0]);
+          final second = _resolveUnit(state, condition.trackedUnitIds[1]);
+          if (first == null ||
+              second == null ||
+              !first.active ||
+              !second.active) {
+            return false;
+          }
+          return _distance(first.position, second.position) <=
+              (condition.range ?? 1);
+        case EventConditionType.unitAtPoint:
+          if (condition.trackedUnitIds.isEmpty ||
+              condition.targetPointIds.isEmpty) {
+            return false;
+          }
+          final unit = _resolveUnit(state, condition.trackedUnitIds.first);
+          if (unit == null || !unit.active) return false;
+          final zone = state.stage.zoneById(condition.targetPointIds.first);
+          return zone.contains(unit.position);
+        case EventConditionType.unitEscaped:
+          return condition.trackedUnitIds.every(state.escapedUnitIds.contains);
+        case EventConditionType.battleOutcomeIs:
+          return state.outcome == condition.expectedOutcome;
+        case EventConditionType.capturePointControlled:
+          if (condition.targetPointIds.isEmpty ||
+              condition.controllingFaction == null) {
+            return false;
+          }
+          return condition.targetPointIds.every(
+            (pointId) => state.isZoneControlledBy(
+              pointId,
+              condition.controllingFaction!,
+            ),
+          );
+      }
+    });
+  }
+
+  static BattleState _applyEventRewards(
+    BattleState state,
+    List<EventReward> rewards,
+  ) {
+    var updatedUnits = state.units;
+    var rewardLog = [...state.rewardLog];
+
+    for (final reward in rewards) {
+      switch (reward.type) {
+        case EventRewardType.experience:
+        case EventRewardType.morale:
+        case EventRewardType.item:
+        case EventRewardType.branch:
+          rewardLog.add(
+            reward.summary ??
+                reward.payload ??
+                '${reward.targetUnitId ?? 'event'} 보상 처리',
+          );
+        case EventRewardType.defeatUnit:
+          if (reward.targetUnitId == null) break;
+          updatedUnits = [
+            for (final unit in updatedUnits)
+              if (unit.id == reward.targetUnitId)
+                unit.copyWith(hp: 0)
+              else
+                unit,
+          ];
+      }
+    }
+
+    return state.copyWith(units: updatedUnits, rewardLog: rewardLog);
   }
 
   static BattleUnit? _pickTarget(
