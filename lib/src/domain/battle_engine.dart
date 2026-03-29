@@ -10,13 +10,78 @@ class BattleEngine {
       ...stage.playerUnits.map(BattleUnit.fromPlacement),
       ...stage.enemyUnits.map(BattleUnit.fromPlacement),
     ];
-    return BattleState(
+    final state = BattleState(
       stage: stage,
       turn: 1,
       phase: BattlePhase.player,
       units: units,
       log: ['${stage.name} 개전 — ${stage.objective}'],
       outcome: BattleOutcome.ongoing,
+      captureStates: {
+        for (final point in stage.capturePoints)
+          point.id: CapturePointState(
+            pointId: point.id,
+            controller: null,
+            heldTurns: 0,
+          ),
+      },
+      escapedUnitIds: const <String>[],
+      triggeredEvents: const <BattleEventRecord>[],
+      rewardLog: const <String>[],
+    );
+    return resolveState(state);
+  }
+
+  static BattleState resolveState(BattleState state) {
+    var resolved = _resolveEscapes(state);
+    resolved = _resolveCapturePoints(resolved);
+    final outcome = _evaluateOutcome(resolved);
+    return resolved.copyWith(outcome: outcome);
+  }
+
+  static BattleOutcome evaluateOutcome(BattleState state) =>
+      _evaluateOutcome(state);
+
+  static BattleState markUnitEscaped(BattleState state, String unitId) {
+    final unit = _resolveUnit(state, unitId);
+    if (unit == null) {
+      return state;
+    }
+    final updatedUnits = [
+      for (final candidate in state.units)
+        if (candidate.id == unitId)
+          candidate.copyWith(escaped: true, hasMoved: true, hasActed: true)
+        else
+          candidate,
+    ];
+    final escapedIds = [
+      ...state.escapedUnitIds.where((id) => id != unitId),
+      unitId,
+    ];
+    return resolveState(
+      state.copyWith(
+        units: updatedUnits,
+        escapedUnitIds: escapedIds,
+      ),
+    );
+  }
+
+  static BattleState setCapturePointController(
+    BattleState state,
+    String pointId,
+    Faction faction,
+  ) {
+    final current = state.captureStates[pointId];
+    if (current == null) {
+      return state;
+    }
+    return resolveState(
+      state.copyWith(
+        captureStates: {
+          ...state.captureStates,
+          pointId: current.copyWith(controller: faction, heldTurns: 1),
+        },
+      ),
     );
   }
 
@@ -28,7 +93,7 @@ class BattleEngine {
 
   static List<GridPoint> reachableTiles(BattleState state, Object unitOrId) {
     final unit = _resolveUnit(state, unitOrId);
-    if (unit == null || !unit.alive) return const [];
+    if (unit == null || !unit.active) return const <GridPoint>[];
 
     final visited = <GridPoint, int>{unit.position: 0};
     final frontier = <GridPoint>[unit.position];
@@ -61,43 +126,37 @@ class BattleEngine {
     Object unitOrId,
   ) {
     final unit = _resolveUnit(state, unitOrId);
-    if (unit == null || !unit.alive) return const [];
+    if (unit == null || !unit.active) return const <BattleUnit>[];
     return state.units
         .where(
           (candidate) =>
-              candidate.alive &&
+              candidate.active &&
               candidate.faction != unit.faction &&
               _distance(unit.position, candidate.position) <= unit.range,
         )
         .toList(growable: false);
   }
 
-  static List<BattleUnit> tacticTargets(
-    BattleState state,
-    Object unitOrId,
-  ) {
+  static List<BattleUnit> tacticTargets(BattleState state, Object unitOrId) {
     final unit = _resolveUnit(state, unitOrId);
-    if (unit == null || !unit.alive) return const [];
+    if (unit == null || !unit.active) return const <BattleUnit>[];
     return state.units
         .where(
           (candidate) =>
-              candidate.alive &&
+              candidate.active &&
               candidate.faction != unit.faction &&
               _distance(unit.position, candidate.position) <= unit.range + 1,
         )
         .toList(growable: false);
   }
 
-  static List<BattleUnit> itemTargets(
-    BattleState state,
-    Object unitOrId,
-  ) {
+  static List<BattleUnit> itemTargets(BattleState state, Object unitOrId) {
     final unit = _resolveUnit(state, unitOrId);
-    if (unit == null || !unit.alive) return const [];
+    if (unit == null || !unit.active) return const <BattleUnit>[];
     return state.units
         .where(
           (candidate) =>
-              candidate.alive &&
+              candidate.active &&
               candidate.faction == unit.faction &&
               candidate.hp < candidate.maxHp &&
               _distance(unit.position, candidate.position) <= 1,
@@ -204,7 +263,7 @@ class BattleEngine {
     var state = createInitialState(stage);
     var rounds = 0;
     while (state.outcome == BattleOutcome.ongoing &&
-        rounds <= stage.turnLimit) {
+        rounds <= stage.turnLimit + 2) {
       state = runFullRound(state, seed: seed + rounds);
       rounds++;
     }
@@ -217,6 +276,7 @@ class BattleEngine {
       survivors: state.units
           .where((unit) => unit.alive)
           .toList(growable: false),
+      triggeredEvents: state.triggeredEvents,
     );
   }
 
@@ -265,7 +325,7 @@ class BattleEngine {
     final target = _resolveUnit(state, command.targetId);
     if (!_isControllablePlayer(attacker) ||
         target == null ||
-        !target.alive ||
+        !target.active ||
         target.faction == attacker!.faction) {
       return _appendLog(state, '유효한 공격 대상을 찾지 못했습니다.');
     }
@@ -294,7 +354,7 @@ class BattleEngine {
         '${resolvedAttacker.name} → ${resolvedTarget.name} $damage피해 (${resolvedTarget.hp}/${resolvedTarget.maxHp})',
       ],
     );
-    return next.copyWith(outcome: _evaluateOutcome(next));
+    return resolveState(next);
   }
 
   static BattleState _waitPlayerUnit(
@@ -312,10 +372,7 @@ class BattleEngine {
     return _replaceUnit(state, updated, '${unit.name} 대기');
   }
 
-  static BattleState _useTactic(
-    BattleState state,
-    UseTacticCommand command,
-  ) {
+  static BattleState _useTactic(BattleState state, UseTacticCommand command) {
     if (state.phase != BattlePhase.player) {
       return _appendLog(state, '지금은 아군 책략을 사용할 수 없는 위상입니다.');
     }
@@ -324,7 +381,7 @@ class BattleEngine {
     final target = _resolveUnit(state, command.targetId);
     if (!_isControllablePlayer(caster) ||
         target == null ||
-        !target.alive ||
+        !target.active ||
         target.faction == caster!.faction) {
       return _appendLog(state, '유효한 책략 대상을 찾지 못했습니다.');
     }
@@ -350,13 +407,10 @@ class BattleEngine {
         '${resolvedCaster.name} 책략 → ${resolvedTarget.name} $damage피해 (${resolvedTarget.hp}/${resolvedTarget.maxHp})',
       ],
     );
-    return next.copyWith(outcome: _evaluateOutcome(next));
+    return resolveState(next);
   }
 
-  static BattleState _useItem(
-    BattleState state,
-    UseItemCommand command,
-  ) {
+  static BattleState _useItem(BattleState state, UseItemCommand command) {
     if (state.phase != BattlePhase.player) {
       return _appendLog(state, '지금은 도구를 사용할 수 없는 위상입니다.');
     }
@@ -365,7 +419,7 @@ class BattleEngine {
     final target = _resolveUnit(state, command.targetId);
     if (!_isControllablePlayer(user) ||
         target == null ||
-        !target.alive ||
+        !target.active ||
         target.faction != user!.faction) {
       return _appendLog(state, '유효한 도구 대상을 찾지 못했습니다.');
     }
@@ -376,9 +430,7 @@ class BattleEngine {
       return _appendLog(state, '${target.name}은(는) 도구 사용 범위 밖에 있습니다.');
     }
 
-    final healedTarget = target.copyWith(
-      hp: min(target.maxHp, target.hp + 5),
-    );
+    final healedTarget = target.copyWith(hp: min(target.maxHp, target.hp + 5));
     final resolvedUser = user.copyWith(
       turnState: user.turnState.copyWith(hasActed: true),
     );
@@ -393,7 +445,7 @@ class BattleEngine {
         '${resolvedUser.name} 도구 → ${healedTarget.name} $restored회복 (${healedTarget.hp}/${healedTarget.maxHp})',
       ],
     );
-    return next.copyWith(outcome: _evaluateOutcome(next));
+    return resolveState(next);
   }
 
   static BattleState _endPlayerTurn(BattleState state) {
@@ -414,12 +466,12 @@ class BattleEngine {
     required int seed,
   }) {
     var working = state;
-    final actors = working.livingUnits(faction);
+    final actors = working.livingUnits(faction).where((unit) => !unit.isNpc);
 
     for (final actor in actors) {
       final currentActor = _resolveUnit(working, actor.id);
       if (currentActor == null ||
-          !currentActor.alive ||
+          !currentActor.active ||
           currentActor.turnState.hasActed) {
         continue;
       }
@@ -435,11 +487,12 @@ class BattleEngine {
         updatedUnits = _replaceUnitInList(updatedUnits, moved);
       }
 
-      final refreshedTarget =
-          updatedUnits.where((unit) => unit.id == target.id).firstOrNull;
+      final refreshedTarget = updatedUnits.firstWhereOrNull(
+        (unit) => unit.id == target.id,
+      );
 
       if (refreshedTarget != null &&
-          refreshedTarget.alive &&
+          refreshedTarget.active &&
           _distance(actedActor.position, refreshedTarget.position) <=
               actedActor.range) {
         final damage = _damageForAttack(
@@ -458,12 +511,14 @@ class BattleEngine {
         );
         updatedUnits = _replaceUnitInList(updatedUnits, resolvedTarget);
         updatedUnits = _replaceUnitInList(updatedUnits, resolvedActor);
-        working = working.copyWith(
-          units: updatedUnits,
-          log: [
-            ...working.log,
-            '${resolvedActor.name} → ${resolvedTarget.name} $damage피해 (${resolvedTarget.hp}/${resolvedTarget.maxHp})',
-          ],
+        working = resolveState(
+          working.copyWith(
+            units: updatedUnits,
+            log: [
+              ...working.log,
+              '${resolvedActor.name} → ${resolvedTarget.name} $damage피해 (${resolvedTarget.hp}/${resolvedTarget.maxHp})',
+            ],
+          ),
         );
       } else {
         final resolvedActor = actedActor.copyWith(
@@ -473,31 +528,157 @@ class BattleEngine {
           ),
         );
         updatedUnits = _replaceUnitInList(updatedUnits, resolvedActor);
-        working = working.copyWith(
-          units: updatedUnits,
-          log: [...working.log, '${resolvedActor.name} 이동 후 대기'],
+        working = resolveState(
+          working.copyWith(
+            units: updatedUnits,
+            log: [...working.log, '${resolvedActor.name} 이동 후 대기'],
+          ),
         );
       }
 
-      final outcome = _evaluateOutcome(working);
-      if (outcome != BattleOutcome.ongoing) {
-        return working.copyWith(outcome: outcome);
+      if (working.outcome != BattleOutcome.ongoing) {
+        return working;
       }
     }
 
-    return working.copyWith(outcome: _evaluateOutcome(working));
+    return resolveState(working);
   }
 
   static BattleOutcome _evaluateOutcome(BattleState state) {
-    final heroes = state.livingUnits(Faction.shu);
-    final enemies = state.livingUnits(Faction.enemy);
-    final lordAlive = heroes.any((unit) => unit.isLord);
-    final bossAlive = enemies.any((unit) => unit.isBoss);
-
-    if (!lordAlive) return BattleOutcome.defeat;
-    if (enemies.isEmpty || !bossAlive) return BattleOutcome.victory;
-    if (state.turn > state.stage.turnLimit) return BattleOutcome.defeat;
+    for (final loss in state.stage.lossTriggers) {
+      if (_lossTriggered(state, loss)) return BattleOutcome.defeat;
+    }
+    if (_objectiveSatisfied(state)) return BattleOutcome.victory;
     return BattleOutcome.ongoing;
+  }
+
+  static bool _objectiveSatisfied(BattleState state) {
+    final rule = state.stage.objectiveRule;
+    switch (rule.type) {
+      case StageObjectiveType.bossDefeat:
+        return rule.trackedUnitIds.every((unitId) {
+          final unit = _resolveUnit(state, unitId);
+          return unit == null || !unit.alive;
+        });
+      case StageObjectiveType.escape:
+        final escaped = state.escapedUnitIds
+            .where(rule.trackedUnitIds.contains)
+            .length;
+        return escaped >= rule.requiredCount;
+      case StageObjectiveType.escort:
+        return rule.trackedUnitIds.every(state.escapedUnitIds.contains);
+      case StageObjectiveType.holdPosition:
+        final points = rule.targetPointIds
+            .map((pointId) => state.captureStates[pointId])
+            .whereType<CapturePointState>();
+        return points.any(
+          (point) =>
+              point.controller == rule.controlFaction &&
+              point.heldTurns >= rule.holdTurns,
+        );
+      case StageObjectiveType.capturePoints:
+        final controlled = rule.targetPointIds
+            .map((pointId) => state.captureStates[pointId])
+            .whereType<CapturePointState>()
+            .where((point) => point.controller == rule.controlFaction)
+            .length;
+        final requiredCount = rule.requiredCount == 0
+            ? rule.targetPointIds.length
+            : rule.requiredCount;
+        return controlled >= requiredCount;
+    }
+  }
+
+  static bool _lossTriggered(BattleState state, StageLossRule loss) {
+    switch (loss.type) {
+      case LossTriggerType.lordDead:
+        if (loss.trackedUnitIds.isEmpty) {
+          return !state.units.any((unit) => unit.isLord && unit.alive);
+        }
+        return loss.trackedUnitIds.any((unitId) {
+          final unit = _resolveUnit(state, unitId);
+          return unit == null || !unit.alive;
+        });
+      case LossTriggerType.npcDead:
+        return loss.trackedUnitIds.any((unitId) {
+          final unit = _resolveUnit(state, unitId);
+          return unit == null || !unit.alive;
+        });
+      case LossTriggerType.turnLimit:
+        final deadline = loss.turnDeadline ?? state.stage.turnLimit;
+        return state.turn > deadline;
+      case LossTriggerType.escapeFailure:
+        final deadline = loss.turnDeadline ?? state.stage.turnLimit;
+        if (state.turn <= deadline) return false;
+        final escaped = state.escapedUnitIds
+            .where(state.stage.objectiveRule.trackedUnitIds.contains)
+            .length;
+        return escaped < loss.requiredCount;
+    }
+  }
+
+  static BattleState _resolveEscapes(BattleState state) {
+    if (state.stage.escapeZones.isEmpty) return state;
+    var escapedIds = [...state.escapedUnitIds];
+    var updatedUnits = [...state.units];
+    final additions = <String>[];
+
+    for (final unit in state.units.where((candidate) => candidate.active)) {
+      final matchedZone = state.stage.escapeZones.firstWhereOrNull(
+        (zone) => zone.matches(unit),
+      );
+      if (matchedZone == null) continue;
+      if (escapedIds.contains(unit.id)) continue;
+      escapedIds.add(unit.id);
+      additions.add('${unit.name} 탈출 성공 (${matchedZone.label})');
+      updatedUnits = _replaceUnitInList(
+        updatedUnits,
+        unit.copyWith(escaped: true, hasActed: true, hasMoved: true),
+      );
+    }
+
+    if (additions.isEmpty) return state;
+    return state.copyWith(
+      units: updatedUnits,
+      escapedUnitIds: escapedIds,
+      log: [...state.log, ...additions],
+    );
+  }
+
+  static BattleState _resolveCapturePoints(BattleState state) {
+    if (state.stage.capturePoints.isEmpty) return state;
+
+    final nextStates = <String, CapturePointState>{};
+    for (final point in state.stage.capturePoints) {
+      final previous =
+          state.captureStates[point.id] ??
+          CapturePointState(pointId: point.id, controller: null, heldTurns: 0);
+      final occupants = state.units
+          .where((unit) => unit.active && unit.position == point.position)
+          .map((unit) => unit.faction)
+          .toSet();
+
+      if (occupants.length != 1 || occupants.first == Faction.neutral) {
+        nextStates[point.id] = CapturePointState(
+          pointId: point.id,
+          controller: null,
+          heldTurns: 0,
+        );
+        continue;
+      }
+
+      final controller = occupants.first;
+      final heldTurns = previous.controller == controller
+          ? previous.heldTurns + 1
+          : 1;
+      nextStates[point.id] = CapturePointState(
+        pointId: point.id,
+        controller: controller,
+        heldTurns: heldTurns,
+      );
+    }
+
+    return state.copyWith(captureStates: nextStates);
   }
 
   static BattleUnit? _pickTarget(
@@ -506,7 +687,7 @@ class BattleEngine {
     required int seed,
   }) {
     final candidates = state.units
-        .where((unit) => unit.faction != actor.faction && unit.alive)
+        .where((unit) => unit.faction != actor.faction && unit.active)
         .toList(growable: false);
     if (candidates.isEmpty) return null;
 
@@ -533,6 +714,7 @@ class BattleEngine {
     score += target.isBoss ? 6 : 0;
     score += target.hp <= actor.attack ? 5 : 0;
     score += target.isLord ? 4 : 0;
+    score += target.isNpc ? 4 : 0;
     score -= terrainAt(state, target.x, target.y).defenseBonus;
     return score;
   }
@@ -620,7 +802,7 @@ class BattleEngine {
       units: refreshedUnits,
       log: [...state.log, '턴 ${state.turn} 종료'],
     );
-    return next.copyWith(outcome: _evaluateOutcome(next));
+    return resolveState(next);
   }
 
   static BattleState _replaceUnit(
@@ -632,7 +814,7 @@ class BattleEngine {
       units: _replaceUnitInList(state.units, updatedUnit),
       log: [...state.log, logLine],
     );
-    return next.copyWith(outcome: _evaluateOutcome(next));
+    return resolveState(next);
   }
 
   static List<BattleUnit> _replaceUnitInList(
@@ -651,16 +833,16 @@ class BattleEngine {
 
   static BattleUnit? _resolveUnit(BattleState state, Object unitOrId) {
     if (unitOrId is BattleUnit) {
-      return state.units.where((unit) => unit.id == unitOrId.id).firstOrNull;
+      return state.units.firstWhereOrNull((unit) => unit.id == unitOrId.id);
     }
     if (unitOrId is String) {
-      return state.units.where((unit) => unit.id == unitOrId).firstOrNull;
+      return state.units.firstWhereOrNull((unit) => unit.id == unitOrId);
     }
     return null;
   }
 
   static bool _isControllablePlayer(BattleUnit? unit) =>
-      unit != null && unit.alive && unit.faction == Faction.shu;
+      unit != null && unit.active && unit.faction == Faction.shu;
 
   static BattleUnit _validatePlayerActionPhase(
     BattleState state,
@@ -698,7 +880,9 @@ class BattleEngine {
   ) {
     final attacker = _validatePlayerActionPhase(state, attackerId);
     final target = _resolveUnit(state, targetId);
-    if (target == null || !target.alive || target.faction == attacker.faction) {
+    if (target == null ||
+        !target.active ||
+        target.faction == attacker.faction) {
       throw ArgumentError('유효한 공격 대상을 찾지 못했습니다: $targetId');
     }
     if (attacker.turnState.hasActed) {
@@ -716,7 +900,7 @@ class BattleEngine {
   ) {
     final caster = _validatePlayerActionPhase(state, casterId);
     final target = _resolveUnit(state, targetId);
-    if (target == null || !target.alive || target.faction == caster.faction) {
+    if (target == null || !target.active || target.faction == caster.faction) {
       throw ArgumentError('유효한 책략 대상을 찾지 못했습니다: $targetId');
     }
     if (caster.turnState.hasActed) {
@@ -727,14 +911,10 @@ class BattleEngine {
     }
   }
 
-  static void _validateItem(
-    BattleState state,
-    String userId,
-    String targetId,
-  ) {
+  static void _validateItem(BattleState state, String userId, String targetId) {
     final user = _validatePlayerActionPhase(state, userId);
     final target = _resolveUnit(state, targetId);
-    if (target == null || !target.alive || target.faction != user.faction) {
+    if (target == null || !target.active || target.faction != user.faction) {
       throw ArgumentError('유효한 도구 대상을 찾지 못했습니다: $targetId');
     }
     if (user.turnState.hasActed) {
@@ -754,7 +934,7 @@ class BattleEngine {
   static bool _occupied(BattleState state, int x, int y, {String? exceptId}) =>
       state.units.any(
         (unit) =>
-            unit.alive && unit.id != exceptId && unit.x == x && unit.y == y,
+            unit.active && unit.id != exceptId && unit.x == x && unit.y == y,
       );
 
   static Iterable<GridPoint> _neighbors(GridPoint point) sync* {

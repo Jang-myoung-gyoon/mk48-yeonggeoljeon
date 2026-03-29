@@ -9,7 +9,11 @@ const List<RequiredScreen> requiredScreens = [
   RequiredScreen(code: 'SC-03', title: '스테이지 선택', purpose: '캠페인 진행 선택'),
   RequiredScreen(code: 'SC-04', title: '스테이지 브리핑', purpose: '전투 전 정보 제공'),
   RequiredScreen(code: 'SC-05', title: '편성/준비 화면', purpose: '출전 장수 및 장비 설정'),
-  RequiredScreen(code: 'SC-06', title: '전투 메인 HUD', purpose: '실제 SRPG 플레이 수동 조작'),
+  RequiredScreen(
+    code: 'SC-06',
+    title: '전투 메인 HUD',
+    purpose: '실제 SRPG 플레이 수동 조작',
+  ),
   RequiredScreen(code: 'SC-07', title: '전투 상세 정보창', purpose: '유닛/타일/기술 정보 확인'),
   RequiredScreen(code: 'SC-08', title: '스토리 대화 화면', purpose: '전투 전후 서사 전달'),
   RequiredScreen(code: 'SC-09', title: '일기토 연출', purpose: '상징적 1:1 대결 강조'),
@@ -28,24 +32,34 @@ class GameDataRepository {
   final List<OfficerProfile> roster = _buildRoster();
   late final List<StageDefinition> stages = _buildStages(roster);
 
-  List<OfficerProfile> get heroes =>
-      roster.where((officer) => officer.faction == Faction.shu).toList(growable: false);
+  List<OfficerProfile> get heroes => roster
+      .where((officer) => officer.faction == Faction.shu && !officer.isNpc)
+      .toList(growable: false);
 
   List<RequiredScreen> get navigationScreens => requiredScreens;
 
   SimulationReport get sampleReport => BattleEngine.simulate(stages.first);
 
-  OfficerProfile getOfficer(String id) => roster.firstWhere((unit) => unit.id == id);
+  OfficerProfile getOfficer(String id) =>
+      roster.firstWhere((unit) => unit.id == id);
 }
 
 class InheritedGameData extends InheritedWidget {
-  const InheritedGameData({super.key, required this.data, required super.child});
+  const InheritedGameData({
+    super.key,
+    required this.data,
+    required super.child,
+  });
 
   final GameDataRepository data;
 
   static GameDataRepository of(BuildContext context) {
-    final inherited = context.dependOnInheritedWidgetOfExactType<InheritedGameData>();
-    assert(inherited != null, 'InheritedGameData is required above this widget.');
+    final inherited = context
+        .dependOnInheritedWidgetOfExactType<InheritedGameData>();
+    assert(
+      inherited != null,
+      'InheritedGameData is required above this widget.',
+    );
     return inherited!.data;
   }
 
@@ -69,6 +83,9 @@ List<OfficerProfile> _buildRoster() {
       mobility: 3,
       range: 1,
       level: 12,
+      defaultEquipment: ['쌍검', '한실 인장'],
+      defaultConsumables: ['붕대'],
+      skillIds: ['benevolent-order'],
     ),
     OfficerProfile(
       id: 'guan-yu',
@@ -84,6 +101,9 @@ List<OfficerProfile> _buildRoster() {
       mobility: 3,
       range: 1,
       level: 13,
+      defaultEquipment: ['청룡언월도', '녹포'],
+      defaultConsumables: ['전투주'],
+      skillIds: ['duel-mastery'],
     ),
     OfficerProfile(
       id: 'zhang-fei',
@@ -99,6 +119,9 @@ List<OfficerProfile> _buildRoster() {
       mobility: 3,
       range: 1,
       level: 13,
+      defaultEquipment: ['장팔사모'],
+      defaultConsumables: ['도발 북'],
+      skillIds: ['intimidation'],
     ),
     OfficerProfile(
       id: 'zhao-yun',
@@ -114,6 +137,9 @@ List<OfficerProfile> _buildRoster() {
       mobility: 4,
       range: 1,
       level: 12,
+      defaultEquipment: ['용담창'],
+      defaultConsumables: ['구급초'],
+      skillIds: ['rescue-charge'],
     ),
     OfficerProfile(
       id: 'zhuge-liang',
@@ -129,6 +155,43 @@ List<OfficerProfile> _buildRoster() {
       mobility: 3,
       range: 2,
       level: 11,
+      defaultEquipment: ['팔괘선'],
+      defaultConsumables: ['화염 부적'],
+      skillIds: ['fire-ambush'],
+    ),
+    OfficerProfile(
+      id: 'xu-zhou-refugee',
+      name: '서주 피난민',
+      unitClass: UnitClass.archer,
+      faction: Faction.shu,
+      title: '호위 대상',
+      signature: '보호가 필요한 민간인',
+      visual: '피난 행렬과 짐수레',
+      maxHp: 14,
+      attack: 2,
+      defense: 2,
+      mobility: 2,
+      range: 1,
+      level: 1,
+      isNpc: true,
+      defaultEquipment: ['짐수레'],
+    ),
+    OfficerProfile(
+      id: 'changban-refugee',
+      name: '장판파 피난민',
+      unitClass: UnitClass.archer,
+      faction: Faction.shu,
+      title: '대피 대상',
+      signature: '조운 구조 이벤트의 핵심 생존자',
+      visual: '아이를 안은 피난민',
+      maxHp: 12,
+      attack: 1,
+      defense: 2,
+      mobility: 2,
+      range: 1,
+      level: 1,
+      isNpc: true,
+      defaultEquipment: ['보급 상자'],
     ),
     OfficerProfile(
       id: 'hua-xiong',
@@ -274,95 +337,515 @@ List<OfficerProfile> _buildRoster() {
 }
 
 List<StageDefinition> _buildStages(List<OfficerProfile> roster) {
-  OfficerProfile officer(String id) => roster.firstWhere((unit) => unit.id == id);
+  OfficerProfile officer(String officerId) =>
+      roster.firstWhere((unit) => unit.id == officerId);
 
-  final stageRows = [
-    ('도원결의의 맹세', '도원결의 / 의병 결성', '튜토리얼 승리', '황건 도적을 제압하고 형제 결의를 맺는다.', '유비 격파', '이동·공격·상성 학습', 8, 0.90, 'hua-xiong'),
-    ('사수관 돌파', '반동탁 연합 / 화웅전', '12턴 내 관문 돌파', '관우 일기토를 유도해 관문을 확보한다.', '유비 격파', '관우 일기토 이벤트', 12, 0.90, 'hua-xiong'),
-    ('호로관의 귀신', '여포전', '생존 후 퇴각로 확보', '여포의 위협을 견디며 협공 타이밍을 만든다.', '핵심 장수 2인 이상 격파', '여포 광역 위협', 10, 0.90, 'lu-bu'),
-    ('서주 구원', '서주 원군전', '민간인 호위', '난민 호송과 마을 화재 진압을 병행한다.', '민간인 전멸', '구호 목표', 11, 0.30, 'cao-cao'),
-    ('하비 포위망', '여포 세력 추격전', '성문 2개 점령', '성문 압박과 궁병 대응을 동시에 수행한다.', '유비 격파', '투석기와 성문', 11, 0.30, 'zhang-liao'),
-    ('여남의 추격', '조조군 압박전', '4기 이상 탈출', '후방 추격을 뿌리치며 보급품을 회수한다.', '탈출 실패', '후방 추격 AI', 9, 0.30, 'xiahou-dun'),
-    ('박망파 화계', '제갈량 첫 책략전', '화공 유인 성공', '숲길에 적을 유인해 화계를 발동한다.', '유인 실패', '숲/화계/매복', 10, 0.30, 'xiahou-dun'),
-    ('장판파 혈로', '조조 남하전', '유비 탈출 및 민간인 보호', '조운 구조 이벤트와 다중 탈출 지점을 운영한다.', '유비 사망', '조운 구조 이벤트', 10, 0.30, 'cao-cao'),
-    ('적벽의 여파', '조조 패주 이후', '강 도하 후 잔당 제압', '수군 지원을 받으며 강변 잔당을 제압한다.', '턴 제한 초과', '강변 지형', 10, 0.30, 'zhang-liao'),
-    ('형주 진입', '형주 장악전', '거점 점령 후 본진 방어', '다방향 증원을 막으며 형주 본진을 확보한다.', '유비 격파', '다방향 증원', 12, 0.30, 'cao-cao'),
-  ];
+  List<UnitPlacement> heroes({
+    int offsetX = 1,
+    int offsetY = 0,
+    bool includeRefugee = false,
+    bool includeChangbanRefugee = false,
+  }) {
+    final heroIds = [
+      'liu-bei',
+      'guan-yu',
+      'zhang-fei',
+      'zhao-yun',
+      'zhuge-liang',
+    ];
+    final placements = <UnitPlacement>[
+      for (var i = 0; i < heroIds.length; i++)
+        UnitPlacement(
+          profile: officer(heroIds[i]),
+          x: offsetX + (i % 2),
+          y: offsetY + i,
+        ),
+    ];
+    if (includeRefugee) {
+      placements.add(
+        UnitPlacement(profile: officer('xu-zhou-refugee'), x: 0, y: 5),
+      );
+    }
+    if (includeChangbanRefugee) {
+      placements.add(
+        UnitPlacement(profile: officer('changban-refugee'), x: 1, y: 5),
+      );
+    }
+    return placements;
+  }
+
+  List<UnitPlacement> enemies({
+    required String bossId,
+    String supportA = 'yellow-turban-vanguard',
+    String supportB = 'allied-archer',
+    String supportC = 'wei-raider',
+  }) {
+    return [
+      UnitPlacement(profile: officer(bossId), x: 7, y: 3),
+      UnitPlacement(profile: officer(supportA), x: 6, y: 1),
+      UnitPlacement(profile: officer(supportB), x: 6, y: 5),
+      UnitPlacement(profile: officer(supportC), x: 5, y: 3),
+    ];
+  }
+
+  StageDefinition stage({
+    required int id,
+    required String name,
+    required String motif,
+    required String objective,
+    required StageObjectiveType objectiveType,
+    required StageObjectiveRule objectiveRule,
+    required String lossCondition,
+    required List<StageLossRule> lossTriggers,
+    required String gimmick,
+    required int turnLimit,
+    required double targetWinRate,
+    required List<UnitPlacement> playerUnits,
+    required List<UnitPlacement> enemyUnits,
+    List<CapturePointDefinition> capturePoints = const [],
+    List<EscapeZoneDefinition> escapeZones = const [],
+  }) {
+    return StageDefinition(
+      id: id,
+      name: name,
+      motif: motif,
+      objective: objective,
+      objectiveType: objectiveType,
+      objectiveRule: objectiveRule,
+      lossCondition: lossCondition,
+      lossTriggers: lossTriggers,
+      eventTriggers: const <StageEventDefinition>[],
+      gimmick: gimmick,
+      turnLimit: turnLimit,
+      width: 9,
+      height: 7,
+      tiles: _buildTerrain(width: 9, height: 7, stageId: id),
+      playerUnits: playerUnits,
+      enemyUnits: enemyUnits,
+      targetWinRate: targetWinRate,
+      capturePoints: capturePoints,
+      escapeZones: escapeZones,
+    );
+  }
 
   return [
-    for (var index = 0; index < stageRows.length; index++)
-      _stageFromRow(
-        id: index + 1,
-        name: stageRows[index].$1,
-        motif: stageRows[index].$2,
-        objective: stageRows[index].$3,
-        gimmick: stageRows[index].$6,
-        lossCondition: stageRows[index].$5,
-        turnLimit: stageRows[index].$7,
-        targetWinRate: stageRows[index].$8,
-        boss: officer(stageRows[index].$9),
-        roster: roster,
+    stage(
+      id: 1,
+      name: '도원결의의 맹세',
+      motif: '도원결의 / 의병 결성',
+      objective: '황건 선봉을 물리치고 보스를 격파한다.',
+      objectiveType: StageObjectiveType.bossDefeat,
+      objectiveRule: const StageObjectiveRule(
+        type: StageObjectiveType.bossDefeat,
+        description: '화웅 격파',
+        trackedUnitIds: ['hua-xiong'],
       ),
+      lossCondition: '유비 격파 또는 8턴 초과',
+      lossTriggers: const [
+        StageLossRule(
+          type: LossTriggerType.lordDead,
+          description: '유비 격파',
+          trackedUnitIds: ['liu-bei'],
+        ),
+        StageLossRule(
+          type: LossTriggerType.turnLimit,
+          description: '8턴 초과',
+          turnDeadline: 8,
+        ),
+      ],
+      gimmick: '이동·공격·상성 학습',
+      turnLimit: 8,
+      targetWinRate: 0.90,
+      playerUnits: heroes(),
+      enemyUnits: enemies(bossId: 'hua-xiong'),
+    ),
+    stage(
+      id: 2,
+      name: '사수관 돌파',
+      motif: '반동탁 연합 / 화웅전',
+      objective: '화웅을 격파하고 관문을 확보한다.',
+      objectiveType: StageObjectiveType.bossDefeat,
+      objectiveRule: const StageObjectiveRule(
+        type: StageObjectiveType.bossDefeat,
+        description: '화웅 격파',
+        trackedUnitIds: ['hua-xiong'],
+      ),
+      lossCondition: '유비 격파 또는 12턴 초과',
+      lossTriggers: const [
+        StageLossRule(
+          type: LossTriggerType.lordDead,
+          description: '유비 격파',
+          trackedUnitIds: ['liu-bei'],
+        ),
+        StageLossRule(
+          type: LossTriggerType.turnLimit,
+          description: '12턴 초과',
+          turnDeadline: 12,
+        ),
+      ],
+      gimmick: '관우 일기토 이벤트',
+      turnLimit: 12,
+      targetWinRate: 0.90,
+      playerUnits: heroes(offsetY: 1),
+      enemyUnits: enemies(
+        bossId: 'hua-xiong',
+        supportA: 'wei-guard',
+        supportB: 'allied-archer',
+        supportC: 'yellow-turban-vanguard',
+      ),
+    ),
+    stage(
+      id: 3,
+      name: '호로관의 귀신',
+      motif: '여포전',
+      objective: '여포를 격퇴하고 전열을 유지한다.',
+      objectiveType: StageObjectiveType.bossDefeat,
+      objectiveRule: const StageObjectiveRule(
+        type: StageObjectiveType.bossDefeat,
+        description: '여포 격퇴',
+        trackedUnitIds: ['lu-bu'],
+      ),
+      lossCondition: '유비 격파 또는 10턴 초과',
+      lossTriggers: const [
+        StageLossRule(
+          type: LossTriggerType.lordDead,
+          description: '유비 격파',
+          trackedUnitIds: ['liu-bei'],
+        ),
+        StageLossRule(
+          type: LossTriggerType.turnLimit,
+          description: '10턴 초과',
+          turnDeadline: 10,
+        ),
+      ],
+      gimmick: '여포 광역 위협',
+      turnLimit: 10,
+      targetWinRate: 0.90,
+      playerUnits: heroes(offsetX: 0),
+      enemyUnits: enemies(
+        bossId: 'lu-bu',
+        supportA: 'allied-archer',
+        supportB: 'wei-raider',
+        supportC: 'wei-guard',
+      ),
+    ),
+    stage(
+      id: 4,
+      name: '서주 구원',
+      motif: '서주 원군전',
+      objective: '서주 피난민을 마을 끝까지 호위한다.',
+      objectiveType: StageObjectiveType.escort,
+      objectiveRule: const StageObjectiveRule(
+        type: StageObjectiveType.escort,
+        description: '서주 피난민 호위',
+        trackedUnitIds: ['xu-zhou-refugee'],
+      ),
+      lossCondition: '유비 격파, 피난민 전멸 또는 11턴 초과',
+      lossTriggers: const [
+        StageLossRule(
+          type: LossTriggerType.lordDead,
+          description: '유비 격파',
+          trackedUnitIds: ['liu-bei'],
+        ),
+        StageLossRule(
+          type: LossTriggerType.npcDead,
+          description: '피난민 전멸',
+          trackedUnitIds: ['xu-zhou-refugee'],
+        ),
+        StageLossRule(
+          type: LossTriggerType.turnLimit,
+          description: '11턴 초과',
+          turnDeadline: 11,
+        ),
+      ],
+      gimmick: '구호 목표',
+      turnLimit: 11,
+      targetWinRate: 0.30,
+      playerUnits: heroes(includeRefugee: true),
+      enemyUnits: enemies(
+        bossId: 'cao-cao',
+        supportA: 'wei-raider',
+        supportB: 'allied-archer',
+        supportC: 'wei-guard',
+      ),
+      escapeZones: const [
+        EscapeZoneDefinition(
+          id: 'xu-village-exit',
+          label: '서주 피난로',
+          eligibleUnitIds: ['xu-zhou-refugee'],
+          tiles: [GridPoint(8, 6)],
+        ),
+      ],
+    ),
+    stage(
+      id: 5,
+      name: '하비 포위망',
+      motif: '여포 세력 추격전',
+      objective: '장료를 격퇴하고 성문 압박을 끝낸다.',
+      objectiveType: StageObjectiveType.bossDefeat,
+      objectiveRule: const StageObjectiveRule(
+        type: StageObjectiveType.bossDefeat,
+        description: '장료 격퇴',
+        trackedUnitIds: ['zhang-liao'],
+      ),
+      lossCondition: '유비 격파 또는 11턴 초과',
+      lossTriggers: const [
+        StageLossRule(
+          type: LossTriggerType.lordDead,
+          description: '유비 격파',
+          trackedUnitIds: ['liu-bei'],
+        ),
+        StageLossRule(
+          type: LossTriggerType.turnLimit,
+          description: '11턴 초과',
+          turnDeadline: 11,
+        ),
+      ],
+      gimmick: '투석기와 성문',
+      turnLimit: 11,
+      targetWinRate: 0.30,
+      playerUnits: heroes(offsetY: 1),
+      enemyUnits: enemies(
+        bossId: 'zhang-liao',
+        supportA: 'wei-guard',
+        supportB: 'allied-archer',
+        supportC: 'wei-raider',
+      ),
+    ),
+    stage(
+      id: 6,
+      name: '여남의 추격',
+      motif: '조조군 압박전',
+      objective: '주력 4인을 탈출시켜 후퇴한다.',
+      objectiveType: StageObjectiveType.escape,
+      objectiveRule: const StageObjectiveRule(
+        type: StageObjectiveType.escape,
+        description: '주력 4기 탈출',
+        trackedUnitIds: [
+          'liu-bei',
+          'guan-yu',
+          'zhang-fei',
+          'zhao-yun',
+          'zhuge-liang',
+        ],
+        requiredCount: 4,
+      ),
+      lossCondition: '유비 격파 또는 탈출 실패',
+      lossTriggers: const [
+        StageLossRule(
+          type: LossTriggerType.lordDead,
+          description: '유비 격파',
+          trackedUnitIds: ['liu-bei'],
+        ),
+        StageLossRule(
+          type: LossTriggerType.escapeFailure,
+          description: '주력 4기 탈출 실패',
+          turnDeadline: 9,
+          requiredCount: 4,
+        ),
+      ],
+      gimmick: '후방 추격 AI',
+      turnLimit: 9,
+      targetWinRate: 0.30,
+      playerUnits: heroes(offsetX: 0),
+      enemyUnits: enemies(
+        bossId: 'xiahou-dun',
+        supportA: 'wei-raider',
+        supportB: 'wei-guard',
+        supportC: 'allied-archer',
+      ),
+      escapeZones: const [
+        EscapeZoneDefinition(
+          id: 'yunan-escape',
+          label: '후퇴 경로',
+          tiles: [
+            GridPoint(8, 0),
+            GridPoint(8, 1),
+            GridPoint(8, 2),
+            GridPoint(8, 3),
+          ],
+        ),
+      ],
+    ),
+    stage(
+      id: 7,
+      name: '박망파 화계',
+      motif: '제갈량 첫 책략전',
+      objective: '하후돈을 유인 후 격퇴한다.',
+      objectiveType: StageObjectiveType.bossDefeat,
+      objectiveRule: const StageObjectiveRule(
+        type: StageObjectiveType.bossDefeat,
+        description: '하후돈 격퇴',
+        trackedUnitIds: ['xiahou-dun'],
+      ),
+      lossCondition: '유비 격파 또는 10턴 초과',
+      lossTriggers: const [
+        StageLossRule(
+          type: LossTriggerType.lordDead,
+          description: '유비 격파',
+          trackedUnitIds: ['liu-bei'],
+        ),
+        StageLossRule(
+          type: LossTriggerType.turnLimit,
+          description: '10턴 초과',
+          turnDeadline: 10,
+        ),
+      ],
+      gimmick: '숲/화계/매복',
+      turnLimit: 10,
+      targetWinRate: 0.30,
+      playerUnits: heroes(offsetY: 1),
+      enemyUnits: enemies(
+        bossId: 'xiahou-dun',
+        supportA: 'wei-raider',
+        supportB: 'allied-archer',
+        supportC: 'wei-guard',
+      ),
+    ),
+    stage(
+      id: 8,
+      name: '장판파 혈로',
+      motif: '조조 남하전',
+      objective: '장판교를 2턴 버텨 유비와 피난민을 지킨다.',
+      objectiveType: StageObjectiveType.holdPosition,
+      objectiveRule: const StageObjectiveRule(
+        type: StageObjectiveType.holdPosition,
+        description: '장판교를 2턴 유지',
+        targetPointIds: ['changban-bridge'],
+        holdTurns: 2,
+        controlFaction: Faction.shu,
+      ),
+      lossCondition: '유비 격파, 피난민 전멸 또는 10턴 초과',
+      lossTriggers: const [
+        StageLossRule(
+          type: LossTriggerType.lordDead,
+          description: '유비 격파',
+          trackedUnitIds: ['liu-bei'],
+        ),
+        StageLossRule(
+          type: LossTriggerType.npcDead,
+          description: '피난민 전멸',
+          trackedUnitIds: ['changban-refugee'],
+        ),
+        StageLossRule(
+          type: LossTriggerType.turnLimit,
+          description: '10턴 초과',
+          turnDeadline: 10,
+        ),
+      ],
+      gimmick: '조운 구조 이벤트',
+      turnLimit: 10,
+      targetWinRate: 0.30,
+      playerUnits: heroes(includeChangbanRefugee: true),
+      enemyUnits: enemies(
+        bossId: 'cao-cao',
+        supportA: 'wei-raider',
+        supportB: 'wei-guard',
+        supportC: 'allied-archer',
+      ),
+      capturePoints: const [
+        CapturePointDefinition(
+          id: 'changban-bridge',
+          label: '장판교',
+          position: GridPoint(4, 3),
+        ),
+      ],
+    ),
+    stage(
+      id: 9,
+      name: '적벽의 여파',
+      motif: '조조 패주 이후',
+      objective: '강가 잔당을 격퇴하고 강변을 확보한다.',
+      objectiveType: StageObjectiveType.bossDefeat,
+      objectiveRule: const StageObjectiveRule(
+        type: StageObjectiveType.bossDefeat,
+        description: '장료 격퇴',
+        trackedUnitIds: ['zhang-liao'],
+      ),
+      lossCondition: '유비 격파 또는 10턴 초과',
+      lossTriggers: const [
+        StageLossRule(
+          type: LossTriggerType.lordDead,
+          description: '유비 격파',
+          trackedUnitIds: ['liu-bei'],
+        ),
+        StageLossRule(
+          type: LossTriggerType.turnLimit,
+          description: '10턴 초과',
+          turnDeadline: 10,
+        ),
+      ],
+      gimmick: '강변 지형',
+      turnLimit: 10,
+      targetWinRate: 0.30,
+      playerUnits: heroes(offsetY: 1),
+      enemyUnits: enemies(
+        bossId: 'zhang-liao',
+        supportA: 'allied-archer',
+        supportB: 'wei-guard',
+        supportC: 'wei-raider',
+      ),
+    ),
+    stage(
+      id: 10,
+      name: '형주 진입',
+      motif: '형주 장악전',
+      objective: '북문과 보급고를 점령해 형주 거점을 장악한다.',
+      objectiveType: StageObjectiveType.capturePoints,
+      objectiveRule: const StageObjectiveRule(
+        type: StageObjectiveType.capturePoints,
+        description: '북문과 보급고 점령',
+        targetPointIds: ['jing-north-gate', 'jing-supply-depot'],
+        requiredCount: 2,
+        controlFaction: Faction.shu,
+      ),
+      lossCondition: '유비 격파 또는 12턴 초과',
+      lossTriggers: const [
+        StageLossRule(
+          type: LossTriggerType.lordDead,
+          description: '유비 격파',
+          trackedUnitIds: ['liu-bei'],
+        ),
+        StageLossRule(
+          type: LossTriggerType.turnLimit,
+          description: '12턴 초과',
+          turnDeadline: 12,
+        ),
+      ],
+      gimmick: '다방향 증원',
+      turnLimit: 12,
+      targetWinRate: 0.30,
+      playerUnits: heroes(offsetY: 1),
+      enemyUnits: enemies(
+        bossId: 'cao-cao',
+        supportA: 'wei-guard',
+        supportB: 'allied-archer',
+        supportC: 'wei-raider',
+      ),
+      capturePoints: const [
+        CapturePointDefinition(
+          id: 'jing-north-gate',
+          label: '형주 북문',
+          position: GridPoint(7, 2),
+        ),
+        CapturePointDefinition(
+          id: 'jing-supply-depot',
+          label: '보급고',
+          position: GridPoint(6, 5),
+        ),
+      ],
+    ),
   ];
 }
 
-StageDefinition _stageFromRow({
-  required int id,
-  required String name,
-  required String motif,
-  required String objective,
-  required String gimmick,
-  required String lossCondition,
-  required int turnLimit,
-  required double targetWinRate,
-  required OfficerProfile boss,
-  required List<OfficerProfile> roster,
+List<TerrainTile> _buildTerrain({
+  required int width,
+  required int height,
+  required int stageId,
 }) {
-  OfficerProfile officer(String officerId) => roster.firstWhere((unit) => unit.id == officerId);
-
-  final terrain = _buildTerrain(width: 8, height: 6, stageId: id);
-  final heroIds = ['liu-bei', 'guan-yu', 'zhang-fei', 'zhao-yun', 'zhuge-liang'];
-  final playerUnits = [
-    for (var i = 0; i < heroIds.length; i++)
-      UnitPlacement(
-        profile: officer(heroIds[i]),
-        x: 1 + (i % 2),
-        y: i == heroIds.length - 1 ? 0 : 1 + i,
-      ),
-  ];
-  final enemyUnits = [
-    UnitPlacement(profile: boss, x: 6, y: 2),
-    UnitPlacement(profile: _supportEnemy(id, roster), x: 5, y: 1),
-    UnitPlacement(profile: _supportEnemy(id + 1, roster), x: 6, y: 4),
-    UnitPlacement(profile: _supportEnemy(id + 2, roster), x: 4, y: 3),
-  ];
-
-  return StageDefinition(
-    id: id,
-    name: name,
-    motif: motif,
-    objective: objective,
-    lossCondition: lossCondition,
-    gimmick: gimmick,
-    turnLimit: turnLimit,
-    width: 8,
-    height: 6,
-    tiles: terrain,
-    playerUnits: playerUnits,
-    enemyUnits: enemyUnits,
-    targetWinRate: targetWinRate,
-  );
-}
-
-OfficerProfile _supportEnemy(int seed, List<OfficerProfile> roster) {
-  final pool = roster.where((unit) => unit.faction == Faction.enemy && !unit.isBoss).toList(growable: false);
-  return pool[seed % pool.length];
-}
-
-List<TerrainTile> _buildTerrain({required int width, required int height, required int stageId}) {
   final tiles = <TerrainTile>[];
   final forestBand = stageId % height;
-  final riverColumn = stageId % width;
+  final riverColumn = (stageId + 2) % width;
 
   for (var y = 0; y < height; y++) {
     for (var x = 0; x < width; x++) {

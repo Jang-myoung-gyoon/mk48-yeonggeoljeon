@@ -6,6 +6,10 @@ import 'package:ralphthon/src/domain/models.dart';
 void main() {
   final repository = GameDataRepository.instance;
   final firstStage = repository.stages.first;
+  final stage4 = repository.stages[3];
+  final stage6 = repository.stages[5];
+  final stage8 = repository.stages[7];
+  final stage10 = repository.stages[9];
 
   test('reachable tiles stay within mobility and avoid impassable terrain', () {
     final state = BattleEngine.createInitialState(firstStage);
@@ -94,7 +98,9 @@ void main() {
 
   test('manual tactic command damages only valid targets in tactic range', () {
     final state = BattleEngine.createInitialState(firstStage);
-    final strategist = state.units.firstWhere((unit) => unit.id == 'zhuge-liang');
+    final strategist = state.units.firstWhere(
+      (unit) => unit.id == 'zhuge-liang',
+    );
     final boss = state.units.firstWhere((unit) => unit.id == 'hua-xiong');
     final nearbyBoss = boss.copyWith(x: strategist.x + 2, y: strategist.y);
     final adjusted = state.copyWith(
@@ -156,11 +162,7 @@ void main() {
       isTrue,
     );
     expect(
-      () => BattleEngine.useItem(
-        state,
-        userId: liuBei.id,
-        targetId: 'guan-yu',
-      ),
+      () => BattleEngine.useItem(state, userId: liuBei.id, targetId: 'guan-yu'),
       throwsArgumentError,
     );
   });
@@ -176,20 +178,12 @@ void main() {
   });
 
   test('exceeding the stage turn limit resolves to defeat immediately', () {
-    final suddenDeathStage = StageDefinition(
-      id: firstStage.id,
-      name: firstStage.name,
-      motif: firstStage.motif,
-      objective: firstStage.objective,
-      lossCondition: firstStage.lossCondition,
-      gimmick: firstStage.gimmick,
+    final suddenDeathStage = firstStage.copyWith(
       turnLimit: 1,
-      width: firstStage.width,
-      height: firstStage.height,
-      tiles: firstStage.tiles,
-      playerUnits: firstStage.playerUnits,
-      enemyUnits: firstStage.enemyUnits,
-      targetWinRate: firstStage.targetWinRate,
+      lossTriggers: const [
+        StageLossRule(type: LossTriggerType.lordDead, description: '유비 격파'),
+        StageLossRule(type: LossTriggerType.turnLimit, description: '1턴 초과', turnDeadline: 1),
+      ],
     );
     final state = BattleEngine.createInitialState(suddenDeathStage);
 
@@ -222,5 +216,80 @@ void main() {
     expect(report.stageName, firstStage.name);
     expect(report.log.first, contains(firstStage.objective));
     expect(report.survivors, isNotEmpty);
+  });
+
+  test('stage 1, 4, 6, 8, 10 expose distinct executable objective types', () {
+    expect(firstStage.objectiveType, StageObjectiveType.bossDefeat);
+    expect(stage4.objectiveType, StageObjectiveType.escort);
+    expect(stage6.objectiveType, StageObjectiveType.escape);
+    expect(stage8.objectiveType, StageObjectiveType.holdPosition);
+    expect(stage10.objectiveType, StageObjectiveType.capturePoints);
+  });
+
+  test('escort stages resolve victory when the tracked convoy reaches an escape zone', () {
+    final state = BattleEngine.createInitialState(stage4);
+    final escaped = state.units
+        .map(
+          (unit) => unit.id == 'xu-zhou-refugee'
+              ? unit.copyWith(x: 8, y: 6)
+              : unit,
+        )
+        .toList(growable: false);
+
+    final next = BattleEngine.resolveState(state.copyWith(units: escaped));
+
+    expect(next.outcome, BattleOutcome.victory);
+  });
+
+  test('escape stages resolve victory when enough tracked units have escaped', () {
+    final state = BattleEngine.createInitialState(stage6);
+    final escapedUnits = state.units
+        .map(
+          (unit) => ['liu-bei', 'guan-yu', 'zhang-fei', 'zhao-yun']
+                  .contains(unit.id)
+              ? unit.copyWith(x: 8, y: 0)
+              : unit,
+        )
+        .toList(growable: false);
+
+    final next = BattleEngine.resolveState(state.copyWith(units: escapedUnits));
+
+    expect(next.outcome, BattleOutcome.victory);
+  });
+
+  test('hold-position stages resolve victory after the bridgehead is held long enough', () {
+    final state = BattleEngine.createInitialState(stage8);
+    final next = state.copyWith(
+      turn: 3,
+      captureStates: const {
+        'changban-bridge': CapturePointState(
+          pointId: 'changban-bridge',
+          controller: Faction.shu,
+          heldTurns: 2,
+        ),
+      },
+    );
+
+    expect(BattleEngine.evaluateOutcome(next), BattleOutcome.victory);
+  });
+
+  test('capture-point stages resolve victory when all required points are controlled', () {
+    final state = BattleEngine.createInitialState(stage10);
+    final next = state.copyWith(
+      captureStates: const {
+        'jing-north-gate': CapturePointState(
+          pointId: 'jing-north-gate',
+          controller: Faction.shu,
+          heldTurns: 1,
+        ),
+        'jing-supply-depot': CapturePointState(
+          pointId: 'jing-supply-depot',
+          controller: Faction.shu,
+          heldTurns: 1,
+        ),
+      },
+    );
+
+    expect(BattleEngine.evaluateOutcome(next), BattleOutcome.victory);
   });
 }

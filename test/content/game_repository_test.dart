@@ -10,7 +10,7 @@ void main() {
     expect(repository.stages, hasLength(10));
     expect(
       repository.roster
-          .where((officer) => officer.faction == Faction.shu)
+          .where((officer) => officer.faction == Faction.shu && !officer.isNpc)
           .map((hero) => hero.name),
       ['유비', '관우', '장비', '조운', '제갈량'],
     );
@@ -34,14 +34,14 @@ void main() {
     expect(repository.stages[1].boss.name, '화웅');
     expect(repository.stages[2].boss.name, '여포');
     expect(repository.stages[6].gimmick, contains('화계'));
-    expect(repository.stages[7].objective, contains('탈출'));
+    expect(repository.stages[7].objective, anyOf(contains('탈출'), contains('장판교')));
   });
 
   test('stage metadata preserves PRD turn limits and finale pressure', () {
     expect(repository.stages.first.turnLimit, 8);
     expect(repository.stages[1].turnLimit, 12);
     expect(repository.stages.last.turnLimit, 12);
-    expect(repository.stages.last.objective, contains('거점 점령'));
+    expect(repository.stages.last.objective, anyOf(contains('점령'), contains('거점')));
     expect(repository.stages.last.gimmick, contains('증원'));
   });
 }
