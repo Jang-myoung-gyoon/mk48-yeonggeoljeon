@@ -10,7 +10,7 @@ class StageSelectionScreen extends StatelessWidget {
     return ChronicleShell(
       current: AppRoute.stageSelection,
       title: '스테이지 선택',
-      subtitle: '진행도에 따라 해금된 전장만 선택할 수 있습니다.',
+      subtitle: '캠페인 진행도와 무관하게 모든 전장 브리핑에 바로 접근할 수 있습니다.',
       child: ListView(
         children: [
           for (final stage in data.stages)
@@ -20,18 +20,15 @@ class StageSelectionScreen extends StatelessWidget {
                 title: Text('Stage ${stage.id}. ${stage.name}'),
                 subtitle: Text(
                   '${stage.motif} · 목표 승률 ${(stage.targetWinRate * 100).round()}% · '
-                  '${session.campaignState.unlockedStageIds.contains(stage.id) ? '해금됨' : '잠김'}',
+                  '${session.campaignState.unlockedStageIds.contains(stage.id) ? '진행도 해금됨' : '직접 접근 가능'}',
                 ),
                 trailing: FilledButton(
-                  onPressed:
-                      session.campaignState.unlockedStageIds.contains(stage.id)
-                      ? () {
-                          session.selectStage(stage.id);
-                          Navigator.of(
-                            context,
-                          ).pushNamed(AppRoute.stageBriefing.path);
-                        }
-                      : null,
+                  onPressed: () {
+                    session.selectStage(stage.id);
+                    Navigator.of(
+                      context,
+                    ).pushNamed(AppRoute.stageBriefing.path);
+                  },
                   child: const Text('브리핑'),
                 ),
               ),
@@ -72,12 +69,12 @@ class StageBriefingScreen extends StatelessWidget {
             child: Column(
               children: [
                 for (final unit in stage.playerUnits)
-                  ListTile(
-                    leading: OfficerAvatar(profile: unit.profile),
-                    title: Text(unit.profile.name),
-                    subtitle: Text(
-                      '${unit.profile.title} · ${unit.profile.signature}',
-                    ),
+                  _OfficerTile(
+                    profile: unit.profile,
+                    note:
+                        '${unit.profile.title} · ${unit.profile.signature}\n'
+                        '배치 (${unit.x}, ${unit.y}) · 브리핑 대기',
+                    animationState: 'idle',
                   ),
               ],
             ),

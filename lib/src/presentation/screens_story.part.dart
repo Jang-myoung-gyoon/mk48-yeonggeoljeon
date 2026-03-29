@@ -30,33 +30,85 @@ class DialogueScreen extends StatelessWidget {
   }
 }
 
-class DuelScreen extends StatelessWidget {
+class DuelScreen extends StatefulWidget {
   const DuelScreen({super.key});
 
   @override
+  State<DuelScreen> createState() => _DuelScreenState();
+}
+
+class _DuelScreenState extends State<DuelScreen> {
+  String _leftAnimation = 'idle';
+  String _rightAnimation = 'idle';
+  Timer? _attackTimer;
+  Timer? _resetTimer;
+  bool _scheduled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_scheduled) {
+      return;
+    }
+    _scheduled = true;
+    _attackTimer = Timer(const Duration(milliseconds: 800), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _leftAnimation = 'attack';
+        _rightAnimation = 'hit';
+      });
+    });
+    _resetTimer = Timer(const Duration(milliseconds: 1600), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _leftAnimation = 'idle';
+        _rightAnimation = 'idle';
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _attackTimer?.cancel();
+    _resetTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final data = InheritedGameData.of(context);
+    final guanYu = data.getOfficer('guan-yu');
+    final huaXiong = data.getOfficer('hua-xiong');
     return ChronicleShell(
       current: AppRoute.duel,
       title: '일기토 연출',
       subtitle: '관우 vs 화웅 같은 지정 조합에서 별도 연출 카드와 결과 보상을 제공합니다.',
       child: Row(
-        children: const [
+        children: [
           Expanded(
             child: _DuelPanel(
-              name: '관우',
+              profile: guanYu,
               tag: '도전 · 청룡언월도',
               accent: Faction.shu,
+              animationState: _leftAnimation,
+              facing: CharacterFacing.east,
             ),
           ),
-          Padding(
+          const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text('對', style: TextStyle(fontSize: 36)),
           ),
           Expanded(
             child: _DuelPanel(
-              name: '화웅',
+              profile: huaXiong,
               tag: '방어 · 흑철 대도부',
               accent: Faction.enemy,
+              animationState: _rightAnimation,
+              facing: CharacterFacing.west,
             ),
           ),
         ],

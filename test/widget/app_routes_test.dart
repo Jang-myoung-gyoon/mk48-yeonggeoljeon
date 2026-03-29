@@ -66,4 +66,31 @@ void main() {
       AppRoute.battleHud.path,
     );
   });
+
+  testWidgets(
+    'shell hides route controls until the top action opens the sheet',
+    (tester) async {
+      tester.view.physicalSize = const Size(1600, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(NanseHeroesApp(initialRoute: '/battle'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Drawer), findsNothing);
+      expect(find.text('SC-02 메인 메뉴'), findsNothing);
+
+      await tester.tap(find.text('화면 컨트롤'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('화면 컨트롤'), findsWidgets);
+      expect(find.text('SC-02 메인 메뉴'), findsOneWidget);
+
+      await tester.tap(find.text('SC-02 메인 메뉴'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('메인 메뉴'), findsWidgets);
+    },
+  );
 }

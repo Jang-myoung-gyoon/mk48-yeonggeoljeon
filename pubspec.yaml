@@ -59,6 +59,27 @@ flutter:
 
   assets:
     - assets/characters/
+    - assets/characters/liu-bei/
+    - assets/characters/liu-bei/base/
+    - assets/characters/liu-bei/animations/
+    - assets/characters/liu-bei/icon/
+    - assets/characters/guan-yu/
+    - assets/characters/guan-yu/base/
+    - assets/characters/guan-yu/animations/
+    - assets/characters/guan-yu/icon/
+    - assets/characters/zhang-fei/
+    - assets/characters/zhang-fei/base/
+    - assets/characters/zhang-fei/animations/
+    - assets/characters/zhang-fei/icon/
+    - assets/characters/zhao-yun/
+    - assets/characters/zhao-yun/base/
+    - assets/characters/zhao-yun/animations/
+    - assets/characters/zhao-yun/icon/
+    - assets/characters/zhuge-liang/
+    - assets/characters/zhuge-liang/base/
+    - assets/characters/zhuge-liang/animations/
+    - assets/characters/zhuge-liang/icon/
+    - assets/characters/specs/
     - assets/tiles/
 
   # To add assets to your application, add an assets section, like this:
