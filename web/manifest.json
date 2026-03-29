@@ -1,0 +1,35 @@
+{
+    "name": "난세영걸전",
+    "short_name": "난세영걸전",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#19120F",
+    "theme_color": "#B99156",
+    "description": "삼국지 영걸전 감성의 Flutter 기반 SRPG 수직 슬라이스.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}
