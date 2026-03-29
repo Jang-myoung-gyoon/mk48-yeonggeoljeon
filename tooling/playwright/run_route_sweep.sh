@@ -44,4 +44,4 @@ PY
   done
 fi
 
-RALPHTHON_BASE_URL="${BASE_URL}" node tooling/playwright/route_sweep.mjs
+RALPHTHON_BASE_URL="${BASE_URL}" npx -y -p playwright node tooling/playwright/route_sweep.mjs
