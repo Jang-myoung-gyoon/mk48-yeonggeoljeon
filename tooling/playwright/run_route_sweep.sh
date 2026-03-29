@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PORT="${RALPHTHON_WEB_PORT:-7357}"
 BASE_URL="${RALPHTHON_BASE_URL:-http://localhost:${PORT}}"
 SERVER_PID=""
@@ -44,4 +45,6 @@ PY
   done
 fi
 
-RALPHTHON_BASE_URL="${BASE_URL}" npx -y -p playwright node tooling/playwright/route_sweep.mjs
+cd "${SCRIPT_DIR}"
+npm install --silent >/dev/null
+RALPHTHON_BASE_URL="${BASE_URL}" node route_sweep.mjs
