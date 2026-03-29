@@ -34,14 +34,42 @@ void main() {
     expect(repository.stages[1].boss.name, '화웅');
     expect(repository.stages[2].boss.name, '여포');
     expect(repository.stages[6].gimmick, contains('화계'));
-    expect(repository.stages[7].objective, anyOf(contains('탈출'), contains('장판교')));
+    expect(repository.stages[7].objectiveType, StageObjectiveType.holdPosition);
   });
 
   test('stage metadata preserves PRD turn limits and finale pressure', () {
     expect(repository.stages.first.turnLimit, 8);
     expect(repository.stages[1].turnLimit, 12);
     expect(repository.stages.last.turnLimit, 12);
-    expect(repository.stages.last.objective, anyOf(contains('점령'), contains('거점')));
+    expect(repository.stages.last.objective, contains('점령'));
     expect(repository.stages.last.gimmick, contains('증원'));
   });
+
+  test('stages 1, 4, 6, 8, 10 expose distinct executable objective types', () {
+    expect(repository.stages[0].objectiveType, StageObjectiveType.bossDefeat);
+    expect(repository.stages[3].objectiveType, StageObjectiveType.escort);
+    expect(repository.stages[5].objectiveType, StageObjectiveType.escape);
+    expect(repository.stages[7].objectiveType, StageObjectiveType.holdPosition);
+    expect(
+      repository.stages[9].objectiveType,
+      StageObjectiveType.capturePoints,
+    );
+  });
+
+  test(
+    'loss and zone metadata is available for escort, escape, hold, and capture stages',
+    () {
+      expect(
+        repository.stages[3].lossTriggers.map((trigger) => trigger.type),
+        contains(LossTriggerType.npcDead),
+      );
+      expect(repository.stages[3].escapeZones, isNotEmpty);
+      expect(
+        repository.stages[5].lossTriggers.map((trigger) => trigger.type),
+        contains(LossTriggerType.escapeFailure),
+      );
+      expect(repository.stages[7].capturePoints, hasLength(1));
+      expect(repository.stages[9].capturePoints, hasLength(2));
+    },
+  );
 }

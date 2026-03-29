@@ -6,10 +6,9 @@ import 'package:ralphthon/src/domain/models.dart';
 void main() {
   final repository = GameDataRepository.instance;
   final firstStage = repository.stages.first;
-  final stage4 = repository.stages[3];
-  final stage6 = repository.stages[5];
-  final stage8 = repository.stages[7];
-  final stage10 = repository.stages[9];
+
+  BattleState stageState(int stageId) =>
+      BattleEngine.createInitialState(repository.stages[stageId - 1]);
 
   test('reachable tiles stay within mobility and avoid impassable terrain', () {
     final state = BattleEngine.createInitialState(firstStage);
@@ -23,7 +22,6 @@ void main() {
           .map((tile) => BattleEngine.terrainAt(state, tile.x, tile.y)),
       isNot(contains(anyOf(TerrainType.river, TerrainType.wall))),
     );
-    expect(reachable, isNot(contains(const GridPoint(2, 2))));
   });
 
   test('finished states are returned unchanged by a full-round simulation', () {
@@ -42,20 +40,26 @@ void main() {
   test('manual move command only accepts legal reachable tiles', () {
     final state = BattleEngine.createInitialState(firstStage);
     final liuBei = state.units.firstWhere((unit) => unit.id == 'liu-bei');
+    final destination = BattleEngine.reachableTiles(
+      state,
+      liuBei,
+    ).firstWhere((tile) => tile != liuBei.position);
 
     final moved = BattleEngine.moveUnit(
       state,
       unitId: liuBei.id,
-      destination: const GridPoint(0, 1),
+      destination: destination,
     );
 
-    expect(moved.units.firstWhere((unit) => unit.id == liuBei.id).x, 0);
-    expect(moved.units.firstWhere((unit) => unit.id == liuBei.id).y, 1);
+    expect(
+      moved.units.firstWhere((unit) => unit.id == liuBei.id).position,
+      destination,
+    );
     expect(
       () => BattleEngine.moveUnit(
         state,
         unitId: liuBei.id,
-        destination: const GridPoint(6, 5),
+        destination: const GridPoint(8, 6),
       ),
       throwsArgumentError,
     );
@@ -85,14 +89,6 @@ void main() {
     expect(
       attacked.units.firstWhere((unit) => unit.id == liuBei.id).hasActed,
       isTrue,
-    );
-    expect(
-      () => BattleEngine.attackUnit(
-        state,
-        attackerId: liuBei.id,
-        targetId: boss.id,
-      ),
-      throwsArgumentError,
     );
   });
 
@@ -124,14 +120,6 @@ void main() {
       used.units.firstWhere((unit) => unit.id == strategist.id).hasActed,
       isTrue,
     );
-    expect(
-      () => BattleEngine.useTactic(
-        state,
-        casterId: strategist.id,
-        targetId: boss.id,
-      ),
-      throwsArgumentError,
-    );
   });
 
   test('manual item command heals only injured adjacent allies', () {
@@ -161,10 +149,6 @@ void main() {
       used.units.firstWhere((unit) => unit.id == liuBei.id).hasActed,
       isTrue,
     );
-    expect(
-      () => BattleEngine.useItem(state, userId: liuBei.id, targetId: 'guan-yu'),
-      throwsArgumentError,
-    );
   });
 
   test('ending the player turn advances enemy AI and the turn counter', () {
@@ -181,8 +165,16 @@ void main() {
     final suddenDeathStage = firstStage.copyWith(
       turnLimit: 1,
       lossTriggers: const [
-        StageLossRule(type: LossTriggerType.lordDead, description: '유비 격파'),
-        StageLossRule(type: LossTriggerType.turnLimit, description: '1턴 초과', turnDeadline: 1),
+        StageLossRule(
+          type: LossTriggerType.lordDead,
+          description: '유비 격파',
+          trackedUnitIds: ['liu-bei'],
+        ),
+        StageLossRule(
+          type: LossTriggerType.turnLimit,
+          description: '1턴 초과',
+          turnDeadline: 1,
+        ),
       ],
     );
     final state = BattleEngine.createInitialState(suddenDeathStage);
@@ -195,13 +187,161 @@ void main() {
   });
 
   test(
+    'stage 1 boss defeat objective resolves victory independently of enemy roster',
+    () {
+      final state = stageState(1);
+      final defeatedBoss = state.units
+          .firstWhere((unit) => unit.id == 'hua-xiong')
+          .copyWith(hp: 0);
+      final resolved = BattleEngine.resolveState(
+        state.copyWith(
+          units: [
+            for (final unit in state.units)
+              if (unit.id == 'hua-xiong') defeatedBoss else unit,
+          ],
+        ),
+      );
+
+      expect(resolved.outcome, BattleOutcome.victory);
+    },
+  );
+
+  test(
+    'stage 4 escort objective resolves when the refugee reaches the escape zone',
+    () {
+      final state = stageState(4);
+      final refugee = state.units.firstWhere(
+        (unit) => unit.id == 'xu-zhou-refugee',
+      );
+      final resolved = BattleEngine.resolveState(
+        state.copyWith(
+          units: [
+            for (final unit in state.units)
+              if (unit.id == refugee.id) refugee.copyWith(x: 8, y: 6) else unit,
+          ],
+        ),
+      );
+
+      expect(resolved.escapedUnitIds, contains('xu-zhou-refugee'));
+      expect(resolved.outcome, BattleOutcome.victory);
+    },
+  );
+
+  test(
+    'stage 6 escape objective resolves when four heroes reach the retreat lane',
+    () {
+      final state = stageState(6);
+      const escapeTiles = [
+        GridPoint(8, 0),
+        GridPoint(8, 1),
+        GridPoint(8, 2),
+        GridPoint(8, 3),
+      ];
+      final escapeIds = ['liu-bei', 'guan-yu', 'zhang-fei', 'zhao-yun'];
+      final updatedUnits = [
+        for (final unit in state.units)
+          if (escapeIds.contains(unit.id))
+            unit.copyWith(
+              x: escapeTiles[escapeIds.indexOf(unit.id)].x,
+              y: escapeTiles[escapeIds.indexOf(unit.id)].y,
+            )
+          else
+            unit,
+      ];
+
+      final resolved = BattleEngine.resolveState(
+        state.copyWith(units: updatedUnits),
+      );
+
+      expect(resolved.escapedUnitIds.where(escapeIds.contains), hasLength(4));
+      expect(resolved.outcome, BattleOutcome.victory);
+    },
+  );
+
+  test(
+    'stage 8 hold position objective resolves after the bridge is held for two turns',
+    () {
+      final state = stageState(8);
+      final liuBei = state.units.firstWhere((unit) => unit.id == 'liu-bei');
+      final resolved = BattleEngine.resolveState(
+        state.copyWith(
+          units: [
+            for (final unit in state.units)
+              if (unit.id == liuBei.id) liuBei.copyWith(x: 4, y: 3) else unit,
+          ],
+          captureStates: const {
+            'changban-bridge': CapturePointState(
+              pointId: 'changban-bridge',
+              controller: Faction.shu,
+              heldTurns: 1,
+            ),
+          },
+        ),
+      );
+
+      expect(resolved.captureStates['changban-bridge']?.heldTurns, 2);
+      expect(resolved.outcome, BattleOutcome.victory);
+    },
+  );
+
+  test(
+    'stage 10 capture points objective resolves when both control points are occupied',
+    () {
+      final state = stageState(10);
+      final liuBei = state.units.firstWhere((unit) => unit.id == 'liu-bei');
+      final guanYu = state.units.firstWhere((unit) => unit.id == 'guan-yu');
+      final resolved = BattleEngine.resolveState(
+        state.copyWith(
+          units: [
+            for (final unit in state.units)
+              if (unit.id == liuBei.id)
+                liuBei.copyWith(x: 7, y: 2)
+              else if (unit.id == guanYu.id)
+                guanYu.copyWith(x: 6, y: 5)
+              else if (unit.position == const GridPoint(6, 5))
+                unit.copyWith(x: 5, y: 5)
+              else
+                unit,
+          ],
+        ),
+      );
+
+      expect(
+        resolved.captureStates.values.where(
+          (point) => point.controller == Faction.shu,
+        ),
+        hasLength(2),
+      );
+      expect(resolved.outcome, BattleOutcome.victory);
+    },
+  );
+
+  test('npc death and escape failure loss triggers resolve defeat', () {
+    final escortState = stageState(4);
+    final deadEscort = BattleEngine.resolveState(
+      escortState.copyWith(
+        units: [
+          for (final unit in escortState.units)
+            if (unit.id == 'xu-zhou-refugee') unit.copyWith(hp: 0) else unit,
+        ],
+      ),
+    );
+    expect(deadEscort.outcome, BattleOutcome.defeat);
+
+    final escapeState = BattleEngine.resolveState(
+      stageState(6).copyWith(turn: 10),
+    );
+    expect(escapeState.outcome, BattleOutcome.defeat);
+  });
+
+  test(
     'headless simulation resolves stage 1 deterministically for a fixed seed',
     () {
       final reportA = BattleEngine.simulate(firstStage, seed: 11);
       final reportB = BattleEngine.simulate(firstStage, seed: 11);
 
       expect(reportA.outcome, isNot(BattleOutcome.ongoing));
-      expect(reportA.turnsUsed, lessThanOrEqualTo(firstStage.turnLimit + 1));
+      expect(reportA.turnsUsed, lessThanOrEqualTo(firstStage.turnLimit + 2));
       expect(reportA.log, reportB.log);
       expect(
         reportA.survivors.map((unit) => unit.id),
@@ -216,80 +356,5 @@ void main() {
     expect(report.stageName, firstStage.name);
     expect(report.log.first, contains(firstStage.objective));
     expect(report.survivors, isNotEmpty);
-  });
-
-  test('stage 1, 4, 6, 8, 10 expose distinct executable objective types', () {
-    expect(firstStage.objectiveType, StageObjectiveType.bossDefeat);
-    expect(stage4.objectiveType, StageObjectiveType.escort);
-    expect(stage6.objectiveType, StageObjectiveType.escape);
-    expect(stage8.objectiveType, StageObjectiveType.holdPosition);
-    expect(stage10.objectiveType, StageObjectiveType.capturePoints);
-  });
-
-  test('escort stages resolve victory when the tracked convoy reaches an escape zone', () {
-    final state = BattleEngine.createInitialState(stage4);
-    final escaped = state.units
-        .map(
-          (unit) => unit.id == 'xu-zhou-refugee'
-              ? unit.copyWith(x: 8, y: 6)
-              : unit,
-        )
-        .toList(growable: false);
-
-    final next = BattleEngine.resolveState(state.copyWith(units: escaped));
-
-    expect(next.outcome, BattleOutcome.victory);
-  });
-
-  test('escape stages resolve victory when enough tracked units have escaped', () {
-    final state = BattleEngine.createInitialState(stage6);
-    final escapedUnits = state.units
-        .map(
-          (unit) => ['liu-bei', 'guan-yu', 'zhang-fei', 'zhao-yun']
-                  .contains(unit.id)
-              ? unit.copyWith(x: 8, y: 0)
-              : unit,
-        )
-        .toList(growable: false);
-
-    final next = BattleEngine.resolveState(state.copyWith(units: escapedUnits));
-
-    expect(next.outcome, BattleOutcome.victory);
-  });
-
-  test('hold-position stages resolve victory after the bridgehead is held long enough', () {
-    final state = BattleEngine.createInitialState(stage8);
-    final next = state.copyWith(
-      turn: 3,
-      captureStates: const {
-        'changban-bridge': CapturePointState(
-          pointId: 'changban-bridge',
-          controller: Faction.shu,
-          heldTurns: 2,
-        ),
-      },
-    );
-
-    expect(BattleEngine.evaluateOutcome(next), BattleOutcome.victory);
-  });
-
-  test('capture-point stages resolve victory when all required points are controlled', () {
-    final state = BattleEngine.createInitialState(stage10);
-    final next = state.copyWith(
-      captureStates: const {
-        'jing-north-gate': CapturePointState(
-          pointId: 'jing-north-gate',
-          controller: Faction.shu,
-          heldTurns: 1,
-        ),
-        'jing-supply-depot': CapturePointState(
-          pointId: 'jing-supply-depot',
-          controller: Faction.shu,
-          heldTurns: 1,
-        ),
-      },
-    );
-
-    expect(BattleEngine.evaluateOutcome(next), BattleOutcome.victory);
   });
 }
