@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/app.dart';
+import '../domain/campaign_models.dart';
 import '../data/game_data.dart';
 import '../domain/battle_engine.dart';
 import '../domain/models.dart';
@@ -188,23 +189,29 @@ class StageSelectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = InheritedGameData.of(context);
+    final session = InheritedGameSession.of(context);
     return ChronicleShell(
       current: AppRoute.stageSelection,
       title: '스테이지 선택',
-      subtitle: '10개 전투 노드를 모두 직접 접근 가능한 라우트 허브에 배치했습니다.',
+      subtitle: '진행도에 따라 해금된 전장만 선택할 수 있습니다.',
       child: ListView(
         children: [
           for (final stage in data.stages)
             Card(
               child: ListTile(
+                selected: session.campaignState.selectedStageId == stage.id,
                 title: Text('Stage ${stage.id}. ${stage.name}'),
                 subtitle: Text(
-                  '${stage.motif} · 목표 승률 ${(stage.targetWinRate * 100).round()}%',
+                  '${stage.motif} · 목표 승률 ${(stage.targetWinRate * 100).round()}% · '
+                  '${session.campaignState.unlockedStageIds.contains(stage.id) ? '해금됨' : '잠김'}',
                 ),
                 trailing: FilledButton(
-                  onPressed: () => Navigator.of(
-                    context,
-                  ).pushNamed(AppRoute.stageBriefing.path),
+                  onPressed: session.campaignState.unlockedStageIds.contains(stage.id)
+                      ? () {
+                          session.selectStage(stage.id);
+                          Navigator.of(context).pushNamed(AppRoute.stageBriefing.path);
+                        }
+                      : null,
                   child: const Text('브리핑'),
                 ),
               ),
@@ -220,7 +227,7 @@ class StageBriefingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stage = InheritedGameData.of(context).stages.first;
+    final stage = InheritedGameSession.of(context).selectedStage;
     return ChronicleShell(
       current: AppRoute.stageBriefing,
       title: '스테이지 브리핑',
@@ -228,7 +235,7 @@ class StageBriefingScreen extends StatelessWidget {
       child: ListView(
         children: [
           SectionCard(
-            title: '도원결의의 맹세',
+            title: stage.name,
             child: Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -277,21 +284,31 @@ class FormationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stage = InheritedGameData.of(context).stages.first;
+    final session = InheritedGameSession.of(context);
+    final stage = session.selectedStage;
+    final progress = session.campaignState.officerProgress;
+    final selectedIds = session.campaignState.selectedFormationIds.toSet();
     return ChronicleShell(
       current: AppRoute.formation,
       title: '편성/준비 화면',
-      subtitle: '핵심 장수 5인을 공통 카드 컴포넌트로 정렬해 출전 준비를 구성합니다.',
+      subtitle: '출전 편성, 성장 상태, 장비 슬롯을 실제 캠페인 데이터와 연결합니다.',
       child: ListView(
         children: [
           SectionCard(
             title: '출전 슬롯',
             child: Column(
               children: [
-                for (final unit in stage.playerUnits)
+                for (final officer in session.availableOfficers)
                   _OfficerTile(
-                    profile: unit.profile,
-                    note: '장비: 표준 무기 · 소비품 1개',
+                    profile: officer,
+                    note:
+                        'Lv.${progress[officer.id]!.level} · EXP ${progress[officer.id]!.experience} · '
+                        '장비 ${progress[officer.id]!.equipmentSlots.join(', ')}',
+                    trailing: FilterChip(
+                      label: Text(selectedIds.contains(officer.id) ? '출전 중' : '대기'),
+                      selected: selectedIds.contains(officer.id),
+                      onSelected: (_) => session.toggleFormation(officer.id),
+                    ),
                   ),
               ],
             ),
@@ -311,8 +328,10 @@ class FormationScreen extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton(
-              onPressed: () =>
-                  Navigator.of(context).pushNamed(AppRoute.battleHud.path),
+              onPressed: () {
+                session.startSelectedStage();
+                Navigator.of(context).pushNamed(AppRoute.battleHud.path);
+              },
               child: const Text('전투 시작'),
             ),
           ),
@@ -344,24 +363,29 @@ class _BattleHudScreenState extends State<BattleHudScreen> {
   }
 
   void _initializeBattleState() {
-    state = BattleEngine.createInitialState(
-      InheritedGameData.of(context).stages.first,
-    );
+    final session = InheritedGameSession.of(context);
+    state = session.currentBattle ?? session.startSelectedStage(notify: false);
     selectedUnitId = state.livingUnits(Faction.shu).first.id;
     commandMode = PlayerCommandMode.move;
     _resetAnimations();
   }
 
   void _endTurn() {
+    final session = InheritedGameSession.of(context);
     setState(() {
       state = BattleEngine.endPlayerTurn(state);
+      session.updateCurrentBattle(state);
       _resetAnimations();
     });
   }
 
   void _reset() {
+    final session = InheritedGameSession.of(context);
     setState(() {
-      _initializeBattleState();
+      state = session.startSelectedStage();
+      selectedUnitId = state.livingUnits(Faction.shu).first.id;
+      commandMode = PlayerCommandMode.move;
+      _resetAnimations();
     });
   }
 
@@ -404,36 +428,42 @@ class _BattleHudScreenState extends State<BattleHudScreen> {
 
   void _moveSelected(GridPoint destination) {
     final selectedId = _selectedUnit.id;
+    final session = InheritedGameSession.of(context);
     setState(() {
       state = BattleEngine.moveUnit(
         state,
         unitId: selectedId,
         destination: destination,
       );
+      session.updateCurrentBattle(state);
       animationStates[selectedId] = 'idle';
     });
   }
 
   void _attackSelected(String targetId) {
     final selectedId = _selectedUnit.id;
+    final session = InheritedGameSession.of(context);
     setState(() {
       state = BattleEngine.attackUnit(
         state,
         attackerId: selectedId,
         targetId: targetId,
       );
+      session.updateCurrentBattle(state);
       animationStates[selectedId] = 'attack';
     });
   }
 
   void _tacticSelected(String targetId) {
     final selectedId = _selectedUnit.id;
+    final session = InheritedGameSession.of(context);
     setState(() {
       state = BattleEngine.useTactic(
         state,
         casterId: selectedId,
         targetId: targetId,
       );
+      session.updateCurrentBattle(state);
       animationStates[selectedId] = 'attack';
       commandMode = PlayerCommandMode.move;
     });
@@ -441,12 +471,14 @@ class _BattleHudScreenState extends State<BattleHudScreen> {
 
   void _itemSelected(String targetId) {
     final selectedId = _selectedUnit.id;
+    final session = InheritedGameSession.of(context);
     setState(() {
       state = BattleEngine.useItem(
         state,
         userId: selectedId,
         targetId: targetId,
       );
+      session.updateCurrentBattle(state);
       animationStates[selectedId] = 'idle';
       commandMode = PlayerCommandMode.move;
     });
@@ -454,8 +486,10 @@ class _BattleHudScreenState extends State<BattleHudScreen> {
 
   void _waitSelected() {
     final selectedId = _selectedUnit.id;
+    final session = InheritedGameSession.of(context);
     setState(() {
       state = BattleEngine.waitUnit(state, unitId: selectedId);
+      session.updateCurrentBattle(state);
       animationStates[selectedId] = 'idle';
       commandMode = PlayerCommandMode.move;
     });
@@ -814,46 +848,74 @@ class ResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final report = InheritedGameData.of(context).sampleReport;
+    final session = InheritedGameSession.of(context);
+    final report = session.lastResult;
     return ChronicleShell(
       current: AppRoute.result,
       title: '결과 화면',
-      subtitle: '헤드리스 시뮬레이션 결과와 생존 장수를 동일 데이터 소스로 요약합니다.',
+      subtitle: '경험치, 획득 아이템, 다음 스테이지 해금 상태를 실제 전투 정산으로 표시합니다.',
       child: ListView(
         children: [
           SectionCard(
             title: '전투 요약',
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _FactChip(label: '스테이지', value: report.stageName),
-                _FactChip(
-                  label: '결과',
-                  value: report.outcome == BattleOutcome.victory ? '승리' : '패배',
-                ),
-                _FactChip(label: '사용 턴', value: '${report.turnsUsed}턴'),
-                _FactChip(label: '생존', value: '${report.survivors.length}명'),
-              ],
-            ),
+            child: report == null
+                ? const Text('아직 정산할 전투 결과가 없습니다.')
+                : Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      _FactChip(label: '스테이지', value: 'Stage ${report.stageId}'),
+                      _FactChip(
+                        label: '결과',
+                        value: report.outcome == BattleOutcome.victory ? '승리' : '패배',
+                      ),
+                      _FactChip(label: '보상', value: '${report.items.length}개'),
+                      _FactChip(
+                        label: '해금',
+                        value: report.unlockedStageIds.isEmpty
+                            ? '없음'
+                            : report.unlockedStageIds.join(', '),
+                      ),
+                    ],
+                  ),
           ),
           SectionCard(
-            title: '생존 장수',
-            child: Column(
-              children: [
-                for (final unit in report.survivors)
-                  ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: unit.faction.color,
-                      child: Text(unit.shortName),
-                    ),
-                    title: Text(unit.name),
-                    subtitle: Text(
-                      'HP ${unit.hp}/${unit.maxHp} · ${unit.unitClass.label}',
-                    ),
+            title: '성장/보상',
+            child: report == null
+                ? const SizedBox.shrink()
+                : Column(
+                    children: [
+                      for (final entry in report.experienceAwards.entries)
+                        ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: InheritedGameData.of(
+                              context,
+                            ).getOfficer(entry.key).faction.color,
+                            child: Text(
+                              _leadingGlyph(
+                                InheritedGameData.of(
+                                  context,
+                                ).getOfficer(entry.key).name,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            InheritedGameData.of(context).getOfficer(entry.key).name,
+                          ),
+                          subtitle: Text('경험치 +${entry.value}'),
+                        ),
+                      if (report.items.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text('획득 아이템: ${report.items.join(', ')}'),
+                        ),
+                      const SizedBox(height: 12),
+                      FilledButton(
+                        onPressed: session.applyLastResult,
+                        child: const Text('정산 적용'),
+                      ),
+                    ],
                   ),
-              ],
-            ),
           ),
         ],
       ),
@@ -866,19 +928,23 @@ class OfficerManagementScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final roster = InheritedGameData.of(
-      context,
-    ).roster.where((officer) => officer.faction == Faction.shu);
+    final session = InheritedGameSession.of(context);
+    final roster = session.availableOfficers;
+    final progress = session.campaignState.officerProgress;
     return ChronicleShell(
       current: AppRoute.officerManagement,
       title: '장수 관리 화면',
-      subtitle: '남향 아이콘 재사용을 전제로 한 통합 캐릭터 카드',
+      subtitle: '레벨, 경험치, 장비/소모품 슬롯, 합류 시점을 실제 캠페인 상태에서 읽어옵니다.',
       child: ListView(
         children: [
           for (final officer in roster)
             _OfficerTile(
               profile: officer,
-              note: '남향 아이콘 규격 96×96 · ${officer.signature}',
+              note:
+                  'Lv.${progress[officer.id]!.level} · EXP ${progress[officer.id]!.experience} · '
+                  '합류 Stage ${progress[officer.id]!.availableFromStageId}\n'
+                  '장비 ${progress[officer.id]!.equipmentSlots.join(', ')} · '
+                  '소모품 ${progress[officer.id]!.consumableSlots.join(', ')}',
             ),
         ],
       ),
@@ -891,30 +957,38 @@ class SaveLoadScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final session = InheritedGameSession.of(context);
     return ChronicleShell(
       current: AppRoute.saveLoad,
       title: '저장/불러오기',
-      subtitle: '직렬화 가능한 코어 상태를 저장 슬롯에 매핑하는 자리입니다.',
+      subtitle: '현재 스테이지, 턴, 편성, 성장, 인벤토리, 전투 상태를 슬롯으로 저장합니다.',
       child: ListView(
-        children: const [
-          Card(
-            child: ListTile(
-              title: Text('슬롯 1 · Stage 3 호로관의 귀신'),
-              subtitle: Text('턴 6 · 플레이 타임 00:42'),
+        children: [
+          for (final slot in SaveSlotId.values)
+            Card(
+              child: ListTile(
+                title: Text(
+                  session.slots[slot]?.label ?? '${slot.name} · 빈 슬롯',
+                ),
+                subtitle: Text(
+                  session.slots[slot]?.savedAtIso ??
+                      '현재 캠페인 상태를 여기에 저장할 수 있습니다.',
+                ),
+                trailing: Wrap(
+                  spacing: 8,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => session.loadFromSlot(slot),
+                      child: const Text('불러오기'),
+                    ),
+                    FilledButton(
+                      onPressed: () => session.saveToSlot(slot),
+                      child: const Text('저장'),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          Card(
-            child: ListTile(
-              title: Text('슬롯 2 · Stage 7 박망파 화계'),
-              subtitle: Text('턴 3 · 플레이 타임 01:18'),
-            ),
-          ),
-          Card(
-            child: ListTile(
-              title: Text('슬롯 3 · 빈 슬롯'),
-              subtitle: Text('새 저장 데이터를 생성할 수 있습니다.'),
-            ),
-          ),
         ],
       ),
     );
@@ -1027,10 +1101,15 @@ class _PillarStrip extends StatelessWidget {
 }
 
 class _OfficerTile extends StatelessWidget {
-  const _OfficerTile({required this.profile, required this.note});
+  const _OfficerTile({
+    required this.profile,
+    required this.note,
+    this.trailing,
+  });
 
   final OfficerProfile profile;
   final String note;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -1044,7 +1123,7 @@ class _OfficerTile extends StatelessWidget {
         title: Text('${profile.name} · ${profile.title}'),
         subtitle: Text('$note\n${profile.visual}'),
         isThreeLine: true,
-        trailing: Text('Lv.${profile.level}'),
+        trailing: trailing ?? Text('Lv.${profile.level}'),
       ),
     );
   }

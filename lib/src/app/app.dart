@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/game_data.dart';
+import '../data/game_session_controller.dart';
 import '../domain/models.dart';
 import '../presentation/screens.dart';
 import 'theme.dart';
@@ -40,9 +41,15 @@ class RouteSpec {
 }
 
 class NanseHeroesApp extends StatelessWidget {
-  const NanseHeroesApp({super.key, this.initialRoute = '/'});
+  NanseHeroesApp({
+    super.key,
+    this.initialRoute = '/',
+    GameSessionController? sessionController,
+  }) : sessionController =
+           sessionController ?? GameSessionController(GameDataRepository.instance);
 
   final String initialRoute;
+  final GameSessionController sessionController;
 
   static final List<RouteSpec> routeSpecs = [
     RouteSpec(route: AppRoute.title, screen: requiredScreens[0], builder: (_) => const TitleScreen()),
@@ -105,12 +112,29 @@ class NanseHeroesApp extends StatelessWidget {
         final spec = routeByPath(settings.name ?? AppRoute.title.path);
         return MaterialPageRoute<void>(
           settings: settings,
-          builder: (context) => InheritedGameData(
-            data: GameDataRepository.instance,
-            child: spec.builder(context),
+          builder: (context) => InheritedGameSession(
+            controller: sessionController,
+            child: InheritedGameData(
+              data: GameDataRepository.instance,
+              child: spec.builder(context),
+            ),
           ),
         );
       },
     );
+  }
+}
+
+class InheritedGameSession extends InheritedNotifier<GameSessionController> {
+  const InheritedGameSession({
+    super.key,
+    required GameSessionController controller,
+    required super.child,
+  }) : super(notifier: controller);
+
+  static GameSessionController of(BuildContext context) {
+    final inherited = context.dependOnInheritedWidgetOfExactType<InheritedGameSession>();
+    assert(inherited != null, 'InheritedGameSession is required above this widget.');
+    return inherited!.notifier!;
   }
 }
