@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'models.dart';
+import 'simulation_report_models.dart';
 
 class BattleEngine {
   const BattleEngine._();
@@ -300,6 +301,111 @@ class BattleEngine {
     );
   }
 
+  static HeuristicScoreBreakdown scoreHeuristicTarget(
+    BattleState state,
+    BattleUnit actor,
+    BattleUnit target, {
+    required int seed,
+  }) {
+    final projectedDamage = _damageForAttack(state, actor, target);
+    final objectiveContribution = _objectiveThreatScore(state, actor, target);
+    final killPotentialBonus = projectedDamage >= target.hp ? 8 : 0;
+    final counterRiskPenalty = -_retaliationRiskForTarget(target);
+    final terrainPreference = -terrainAt(state, target.x, target.y).defenseBonus;
+    final lowHealthSurvivalBonus = actor.hp <= (actor.maxHp ~/ 2)
+        ? terrainAt(state, actor.x, actor.y).defenseBonus * 2
+        : 0;
+    final bossValueBonus = target.isBoss ? 6 : 0;
+    final randomnessAdjustment = _controlledJitter(seed, actor.id, target.id);
+    return HeuristicScoreBreakdown(
+      objectiveContribution: objectiveContribution,
+      killPotentialBonus: killPotentialBonus,
+      counterRiskPenalty: counterRiskPenalty,
+      terrainPreference: terrainPreference,
+      lowHealthSurvivalBonus: lowHealthSurvivalBonus,
+      bossValueBonus: bossValueBonus,
+      randomnessAdjustment: randomnessAdjustment,
+    );
+  }
+
+  static StageSimulationSummary simulateStageSeries(
+    StageDefinition stage, {
+    int runs = 10,
+    int seed = 7,
+  }) {
+    var wins = 0;
+    var losses = 0;
+    var totalTurns = 0;
+    for (var i = 0; i < runs; i++) {
+      final result = simulate(stage, seed: seed + i);
+      totalTurns += result.turnsUsed;
+      if (result.outcome == BattleOutcome.victory) {
+        wins++;
+      } else {
+        losses++;
+      }
+    }
+    return StageSimulationSummary(
+      stageId: stage.id,
+      stageName: stage.name,
+      runs: runs,
+      wins: wins,
+      losses: losses,
+      winRate: runs == 0 ? 0 : wins / runs,
+      averageTurns: runs == 0 ? 0 : totalTurns / runs,
+      targetWinRate: stage.targetWinRate,
+    );
+  }
+
+  static SimulationSuiteReport buildSimulationSuite(
+    Iterable<StageDefinition> stages, {
+    int runsPerStage = 10,
+    int seed = 7,
+    String? generatedAtIso,
+  }) {
+    final summaries = <StageSimulationSummary>[];
+    var offset = 0;
+    for (final stage in stages) {
+      summaries.add(
+        simulateStageSeries(stage, runs: runsPerStage, seed: seed + offset),
+      );
+      offset += runsPerStage;
+    }
+    return SimulationSuiteReport(
+      generatedAtIso:
+          generatedAtIso ?? DateTime.now().toUtc().toIso8601String(),
+      runsPerStage: runsPerStage,
+      stageSummaries: summaries,
+    );
+  }
+
+  static SimulationBatchReport simulateBatch(
+    StageDefinition stage, {
+    int runs = 30,
+    int seed = 7,
+  }) {
+    var wins = 0;
+    var totalTurns = 0;
+
+    for (var index = 0; index < runs; index++) {
+      final report = simulate(stage, seed: seed + index);
+      if (report.outcome == BattleOutcome.victory) {
+        wins++;
+      }
+      totalTurns += report.turnsUsed;
+    }
+
+    return SimulationBatchReport(
+      stageId: stage.id,
+      stageName: stage.name,
+      runs: runs,
+      wins: wins,
+      averageTurns: runs == 0 ? 0 : totalTurns / runs,
+      targetWinRate: stage.targetWinRate,
+      seedStart: seed,
+    );
+  }
+
   static BattleState _movePlayerUnit(
     BattleState state,
     MoveUnitCommand command,
@@ -502,7 +608,7 @@ class BattleEngine {
       var actedActor = currentActor;
       var updatedUnits = [...working.units];
       if (_distance(actedActor.position, target.position) > actedActor.range) {
-        final moved = _moveToward(working, actedActor, target);
+        final moved = _moveToward(working, actedActor, target, seed: seed);
         actedActor = moved;
         updatedUnits = _replaceUnitInList(updatedUnits, moved);
       }
@@ -834,7 +940,8 @@ class BattleEngine {
           state,
           actor,
           b,
-        ).compareTo(_targetScore(state, actor, a));
+          seed: seed,
+        ).compareTo(_targetScore(state, actor, a, seed: seed));
         if (scoreCompare != 0) return scoreCompare;
         return a.id.compareTo(b.id);
       });
@@ -845,14 +952,18 @@ class BattleEngine {
     BattleState state,
     BattleUnit actor,
     BattleUnit target,
+    {required int seed}
   ) {
     final distance = _distance(actor.position, target.position);
     var score = 20 - distance;
     score += target.isBoss ? 6 : 0;
-    score += target.hp <= actor.attack ? 5 : 0;
+    score += target.hp <= actor.attack ? 8 : 0;
     score += target.isLord ? 4 : 0;
     score += target.isNpc ? 4 : 0;
+    score += _objectiveThreatScore(state, actor, target);
+    score -= _retaliationRiskForTarget(target);
     score -= terrainAt(state, target.x, target.y).defenseBonus;
+    score += _controlledJitter(seed, actor.id, target.id);
     return score;
   }
 
@@ -860,6 +971,7 @@ class BattleEngine {
     BattleState state,
     BattleUnit actor,
     BattleUnit target,
+    {required int seed}
   ) {
     final destinations = reachableTiles(state, actor);
     final ranked = [...destinations]
@@ -869,7 +981,8 @@ class BattleEngine {
           actor,
           target,
           b,
-        ).compareTo(_moveScore(state, actor, target, a));
+          seed: seed,
+        ).compareTo(_moveScore(state, actor, target, a, seed: seed));
         if (scoreCompare != 0) return scoreCompare;
         final byY = a.y.compareTo(b.y);
         return byY != 0 ? byY : a.x.compareTo(b.x);
@@ -888,13 +1001,99 @@ class BattleEngine {
     BattleUnit actor,
     BattleUnit target,
     GridPoint tile,
+    {required int seed}
   ) {
     final terrain = terrainAt(state, tile.x, tile.y);
     final distanceScore = 12 - _distance(tile, target.position);
     final terrainScore =
         terrain.defenseBonus + (terrain == TerrainType.road ? 1 : 0);
     final aggressionBonus = actor.faction == Faction.enemy ? 1 : 0;
-    return distanceScore + terrainScore + aggressionBonus;
+    final goalBonus = _goalContributionScore(state, actor, tile);
+    final retaliationRisk = _tileRetaliationRisk(state, actor, tile);
+    final lowHpSurvival = actor.hp <= (actor.maxHp ~/ 2)
+        ? terrain.defenseBonus * 2
+        : 0;
+    return distanceScore +
+        terrainScore +
+        aggressionBonus +
+        goalBonus +
+        lowHpSurvival -
+        retaliationRisk +
+        _controlledJitter(seed, actor.id, '${tile.x},${tile.y}');
+  }
+
+  static int _goalContributionScore(
+    BattleState state,
+    BattleUnit actor,
+    GridPoint tile,
+  ) {
+    final objective = state.stage.objectiveRule;
+    switch (objective.type) {
+      case StageObjectiveType.escape:
+      case StageObjectiveType.escort:
+        if (state.stage.escapeZones.isEmpty) return 0;
+        final distance = state.stage.escapeZones
+            .expand((zone) => zone.tiles)
+            .map((point) => _distance(tile, point))
+            .reduce(min);
+        return 14 - distance;
+      case StageObjectiveType.holdPosition:
+      case StageObjectiveType.capturePoints:
+        if (state.stage.capturePoints.isEmpty) return 0;
+        final distance = state.stage.capturePoints
+            .map((point) => _distance(tile, point.position))
+            .reduce(min);
+        return 12 - distance;
+      case StageObjectiveType.bossDefeat:
+        return actor.faction == Faction.shu
+            ? 6 - _distance(tile, targetPositionForObjective(state))
+            : 0;
+    }
+  }
+
+  static GridPoint targetPositionForObjective(BattleState state) {
+    return switch (state.stage.objectiveType) {
+      StageObjectiveType.capturePoints => state.stage.capturePoints.first.position,
+      StageObjectiveType.escape || StageObjectiveType.escort =>
+        state.stage.escapeZones.first.tiles.first,
+      _ => _resolveUnit(state, state.stage.objectiveRule.trackedUnitIds.first)?.position ??
+          const GridPoint(0, 0),
+    };
+  }
+
+  static int _objectiveThreatScore(
+    BattleState state,
+    BattleUnit actor,
+    BattleUnit target,
+  ) {
+    if (actor.faction == Faction.shu) {
+      return target.isBoss ? 6 : 0;
+    }
+    final threatenedIds = {
+      ...state.stage.objectiveRule.trackedUnitIds,
+      ...state.stage.lossTriggers.expand((trigger) => trigger.trackedUnitIds),
+    };
+    return threatenedIds.contains(target.id) ? 5 : 0;
+  }
+
+  static int _retaliationRiskForTarget(BattleUnit target) =>
+      target.attack + (target.isBoss ? 2 : 0);
+
+  static int _tileRetaliationRisk(
+    BattleState state,
+    BattleUnit actor,
+    GridPoint tile,
+  ) {
+    return state.units
+        .where((unit) => unit.active && unit.faction != actor.faction)
+        .where((unit) => _distance(tile, unit.position) <= unit.range)
+        .length *
+        3;
+  }
+
+  static int _controlledJitter(int seed, String left, String right) {
+    final random = Random(Object.hash(seed, left, right));
+    return random.nextInt(3);
   }
 
   static int _damageForAttack(

@@ -747,3 +747,38 @@ class SimulationReport {
   final List<BattleUnit> survivors;
   final List<BattleEventRecord> triggeredEvents;
 }
+
+class SimulationBatchReport {
+  const SimulationBatchReport({
+    required this.stageId,
+    required this.stageName,
+    required this.runs,
+    required this.wins,
+    required this.averageTurns,
+    required this.targetWinRate,
+    required this.seedStart,
+  });
+
+  final int stageId;
+  final String stageName;
+  final int runs;
+  final int wins;
+  final double averageTurns;
+  final double targetWinRate;
+  final int seedStart;
+
+  int get losses => runs - wins;
+  double get winRate => runs == 0 ? 0 : wins / runs;
+
+  Map<String, Object?> toJson() => {
+    'stageId': stageId,
+    'stageName': stageName,
+    'runs': runs,
+    'wins': wins,
+    'losses': losses,
+    'winRate': winRate,
+    'averageTurns': averageTurns,
+    'targetWinRate': targetWinRate,
+    'seedStart': seedStart,
+  };
+}
