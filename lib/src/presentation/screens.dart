@@ -5,6 +5,7 @@ import '../domain/campaign_models.dart';
 import '../data/game_data.dart';
 import '../domain/battle_engine.dart';
 import '../domain/models.dart';
+import 'character_sprite_assets.dart';
 import 'ui_palette_extensions.dart';
 
 String _leadingGlyph(String text) => text.isEmpty ? '?' : text.substring(0, 1);
@@ -253,10 +254,7 @@ class StageBriefingScreen extends StatelessWidget {
               children: [
                 for (final unit in stage.playerUnits)
                   ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: unit.profile.faction.color,
-                      child: Text(_leadingGlyph(unit.profile.name)),
-                    ),
+                    leading: OfficerAvatar(profile: unit.profile),
                     title: Text(unit.profile.name),
                     subtitle: Text(
                       '${unit.profile.title} · ${unit.profile.signature}',
@@ -548,6 +546,7 @@ class _BattleHudScreenState extends State<BattleHudScreen> {
             child: _BattleGrid(
               state: state,
               selectedUnitId: selectedUnit.id,
+              selectedAnimationState: selectedAnimation,
               highlightedTiles: commandMode == PlayerCommandMode.move
                   ? reachableTiles.toSet()
                   : <GridPoint>{},
@@ -584,7 +583,17 @@ class _BattleHudScreenState extends State<BattleHudScreen> {
                   'HP ${selectedUnit.hp}/${selectedUnit.maxHp} · 공격 ${selectedUnit.attack} · 방어 ${selectedUnit.defense} · 이동 ${selectedUnit.mobility} · 사거리 ${selectedUnit.range}',
                 ),
                 const SizedBox(height: 8),
-                Text('애니메이션 상태: $selectedAnimation'),
+                Row(
+                  children: [
+                    BattleUnitSprite(
+                      unit: selectedUnit,
+                      animationState: selectedAnimation,
+                      size: 72,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text('애니메이션 상태: $selectedAnimation')),
+                  ],
+                ),
                 const SizedBox(height: 8),
                 Text('고유 강점: ${selectedUnit.signature}'),
               ],
@@ -1115,11 +1124,7 @@ class _OfficerTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: ListTile(
-        leading: CircleAvatar(
-          radius: 24,
-          backgroundColor: profile.faction.color,
-          child: Text(_leadingGlyph(profile.name)),
-        ),
+        leading: OfficerAvatar(profile: profile),
         title: Text('${profile.name} · ${profile.title}'),
         subtitle: Text('$note\n${profile.visual}'),
         isThreeLine: true,
@@ -1145,6 +1150,7 @@ class _BattleGrid extends StatelessWidget {
   const _BattleGrid({
     required this.state,
     required this.selectedUnitId,
+    required this.selectedAnimationState,
     required this.highlightedTiles,
     required this.attackableUnitIds,
     required this.onUnitSelected,
@@ -1153,6 +1159,7 @@ class _BattleGrid extends StatelessWidget {
 
   final BattleState state;
   final String selectedUnitId;
+  final String selectedAnimationState;
   final Set<GridPoint> highlightedTiles;
   final Set<String> attackableUnitIds;
   final ValueChanged<String> onUnitSelected;
@@ -1190,7 +1197,6 @@ class _BattleGrid extends StatelessWidget {
             },
             child: Container(
               decoration: BoxDecoration(
-                color: terrain.color,
                 border: Border.all(
                   color: isSelected
                       ? Colors.amberAccent
@@ -1204,20 +1210,37 @@ class _BattleGrid extends StatelessWidget {
               ),
               child: Stack(
                 children: [
+                  Positioned.fill(
+                    child: TerrainTileSprite(terrain: terrain),
+                  ),
                   Positioned(
                     left: 4,
                     top: 4,
-                    child: Text(
-                      _leadingGlyph(terrain.label),
-                      style: const TextStyle(fontSize: 11),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.42),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        child: Text(
+                          _leadingGlyph(terrain.label),
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      ),
                     ),
                   ),
                   if (unit != null)
                     Center(
-                      child: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: unit.faction.color,
-                        child: Text(unit.shortName),
+                      child: BattleUnitSprite(
+                        unit: unit,
+                        animationState: unit.id == selectedUnitId
+                            ? selectedAnimationState
+                            : 'idle',
+                        size: 36,
                       ),
                     ),
                 ],

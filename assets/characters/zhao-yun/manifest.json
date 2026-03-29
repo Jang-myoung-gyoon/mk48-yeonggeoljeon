@@ -1,0 +1,38 @@
+{
+  "sprite_id": "zhao-yun",
+  "character_id": "e4775914-8c84-420b-b300-c426a90c5c34",
+  "role": "hero",
+  "rotations": {
+    "south": "assets/characters/zhao-yun/base/south.png",
+    "east": "assets/characters/zhao-yun/base/east.png",
+    "north": "assets/characters/zhao-yun/base/north.png",
+    "west": "assets/characters/zhao-yun/base/west.png"
+  },
+  "icon_96": "assets/characters/zhao-yun/icon/south-96.png",
+  "animations": {
+    "idle": {
+      "south": "assets/characters/zhao-yun/animations/idle-south.gif",
+      "east": "assets/characters/zhao-yun/animations/idle-east.gif",
+      "north": "assets/characters/zhao-yun/animations/idle-north.gif",
+      "west": "assets/characters/zhao-yun/animations/idle-west.gif"
+    },
+    "walk": {
+      "south": "assets/characters/zhao-yun/animations/walk-south.gif",
+      "east": "assets/characters/zhao-yun/animations/walk-east.gif",
+      "north": "assets/characters/zhao-yun/animations/walk-north.gif",
+      "west": "assets/characters/zhao-yun/animations/walk-west.gif"
+    },
+    "attack": {
+      "south": "assets/characters/zhao-yun/animations/attack-south.gif",
+      "east": "assets/characters/zhao-yun/animations/attack-east.gif",
+      "north": "assets/characters/zhao-yun/animations/attack-north.gif",
+      "west": "assets/characters/zhao-yun/animations/attack-west.gif"
+    },
+    "hit": {
+      "south": "assets/characters/zhao-yun/animations/hit-south.gif",
+      "east": "assets/characters/zhao-yun/animations/hit-east.gif",
+      "north": "assets/characters/zhao-yun/animations/hit-north.gif",
+      "west": "assets/characters/zhao-yun/animations/hit-west.gif"
+    }
+  }
+}

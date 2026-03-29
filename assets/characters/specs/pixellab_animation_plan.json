@@ -1,0 +1,12 @@
+{
+  "default": {
+    "idle": "breathing-idle",
+    "walk": "walking-8-frames",
+    "attack": "lead-jab",
+    "hit": "taking-punch"
+  },
+  "overrides": {
+    "zhuge-liang": {"attack": "fireball"},
+    "cao-cao": {"attack": "fireball"}
+  }
+}

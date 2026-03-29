@@ -1,0 +1,100 @@
+[
+  {
+    "id": "liu-bei",
+    "name": "Liu Bei",
+    "role": "hero",
+    "size": 48,
+    "description": "Three Kingdoms Han noble warlord, jade-white robe over restrained lamellar armor, teal cloak, benevolent leader, subtle imperial Han motif, straight sword at hip, Shu palette of jade white pale gold and teal, readable battle silhouette"
+  },
+  {
+    "id": "guan-yu",
+    "name": "Guan Yu",
+    "role": "hero",
+    "size": 48,
+    "description": "Three Kingdoms righteous general with long flowing beard, green robe over heavy armor, guandao polearm silhouette, stern heroic stance, Shu palette of green jade white and gold, instantly readable from top-down"
+  },
+  {
+    "id": "zhang-fei",
+    "name": "Zhang Fei",
+    "role": "hero",
+    "size": 48,
+    "description": "Three Kingdoms fierce vanguard, black armor with red scarf, heavy spear, intimidating broad-shouldered stance, rugged warrior silhouette, Shu allied palette with black red and steel accents"
+  },
+  {
+    "id": "zhao-yun",
+    "name": "Zhao Yun",
+    "role": "hero",
+    "size": 48,
+    "description": "Three Kingdoms agile spear knight, white silver cavalry armor, blue sash, elegant helmet plume, fast heroic stance, Shu palette with white silver and azure, clear spear silhouette"
+  },
+  {
+    "id": "zhuge-liang",
+    "name": "Zhuge Liang",
+    "role": "hero",
+    "size": 48,
+    "description": "Three Kingdoms strategist scholar, white robe, feather fan, black gauze cap, calm commanding pose, refined Shu palette of white teal and pale gold, readable tactician silhouette"
+  },
+  {
+    "id": "hua-xiong",
+    "name": "Hua Xiong",
+    "role": "enemy_boss",
+    "size": 48,
+    "description": "Three Kingdoms brutal frontline boss, bronze and black iron armor, massive cleaver poleblade, savage aggressive stance, rugged helmet, heavy silhouette, enemy palette of dark steel and bronze"
+  },
+  {
+    "id": "lu-bu",
+    "name": "Lu Bu",
+    "role": "enemy_boss",
+    "size": 48,
+    "description": "Three Kingdoms unmatched warlord, red and black armor, phoenix plume, halberd silhouette, dominant terrifying stance, dramatic elite silhouette, Lu Bu palette of crimson black and gold"
+  },
+  {
+    "id": "cao-cao",
+    "name": "Cao Cao",
+    "role": "enemy_boss",
+    "size": 48,
+    "description": "Three Kingdoms supreme commander, black blue noble war robe with gold trim, ornate helmet, strategist sword, composed imperial stance, Wei palette of black blue and gold"
+  },
+  {
+    "id": "zhang-liao",
+    "name": "Zhang Liao",
+    "role": "enemy_boss",
+    "size": 48,
+    "description": "Three Kingdoms fast cavalry general, blue-gray armor, long spear, streamlined mounted-warrior styling adapted to infantry battle sprite, sharp aggressive stance, Wei palette of steel blue and dark teal"
+  },
+  {
+    "id": "xiahou-dun",
+    "name": "Xiahou Dun",
+    "role": "enemy_boss",
+    "size": 48,
+    "description": "Three Kingdoms hardened frontline general, dark blue armor, facial scar, heavy spear and saber styling, stubborn imposing stance, Wei palette of navy steel and muted gold"
+  },
+  {
+    "id": "yellow-turban-vanguard",
+    "name": "Yellow Turban Vanguard",
+    "role": "soldier_variant",
+    "size": 48,
+    "description": "Late Han rebel infantry, yellow headscarf, rough spear, patchwork armor, scrappy militant stance, earthy yellow and brown palette, readable low-tier soldier silhouette"
+  },
+  {
+    "id": "allied-archer",
+    "name": "Gate Archer",
+    "role": "soldier_variant",
+    "size": 48,
+    "description": "Late Han gate defender archer, dark brown light armor, wooden bow, gate-banner sash, disciplined ranged soldier stance, black-brown and muted iron palette"
+  },
+  {
+    "id": "wei-raider",
+    "name": "Wei Raider",
+    "role": "soldier_variant",
+    "size": 48,
+    "description": "Three Kingdoms Wei assault infantry, dark blue light armor, dao saber, fast striking stance, black-blue military palette with brass trim, readable raider silhouette"
+  },
+  {
+    "id": "wei-guard",
+    "name": "Wei Guard",
+    "role": "soldier_variant",
+    "size": 48,
+    "description": "Three Kingdoms Wei shield infantry, dark armored guard with large shield and short spear, defensive square stance, fortress soldier silhouette, black-blue steel palette"
+  }
+]

@@ -1,0 +1,38 @@
+{
+  "sprite_id": "zhang-fei",
+  "character_id": "125264f0-5d87-4a86-9092-7d6e5a98c52e",
+  "role": "hero",
+  "rotations": {
+    "south": "assets/characters/zhang-fei/base/south.png",
+    "east": "assets/characters/zhang-fei/base/east.png",
+    "north": "assets/characters/zhang-fei/base/north.png",
+    "west": "assets/characters/zhang-fei/base/west.png"
+  },
+  "icon_96": "assets/characters/zhang-fei/icon/south-96.png",
+  "animations": {
+    "idle": {
+      "south": "assets/characters/zhang-fei/animations/idle-south.gif",
+      "east": "assets/characters/zhang-fei/animations/idle-east.gif",
+      "north": "assets/characters/zhang-fei/animations/idle-north.gif",
+      "west": "assets/characters/zhang-fei/animations/idle-west.gif"
+    },
+    "walk": {
+      "south": "assets/characters/zhang-fei/animations/walk-south.gif",
+      "east": "assets/characters/zhang-fei/animations/walk-east.gif",
+      "north": "assets/characters/zhang-fei/animations/walk-north.gif",
+      "west": "assets/characters/zhang-fei/animations/walk-west.gif"
+    },
+    "attack": {
+      "south": "assets/characters/zhang-fei/animations/attack-south.gif",
+      "east": "assets/characters/zhang-fei/animations/attack-east.gif",
+      "north": "assets/characters/zhang-fei/animations/attack-north.gif",
+      "west": "assets/characters/zhang-fei/animations/attack-west.gif"
+    },
+    "hit": {
+      "south": "assets/characters/zhang-fei/animations/hit-south.gif",
+      "east": "assets/characters/zhang-fei/animations/hit-east.gif",
+      "north": "assets/characters/zhang-fei/animations/hit-north.gif",
+      "west": "assets/characters/zhang-fei/animations/hit-west.gif"
+    }
+  }
+}

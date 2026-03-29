@@ -1,0 +1,38 @@
+{
+  "sprite_id": "guan-yu",
+  "character_id": "fb6587e7-1f59-4605-8ff0-ee1fa6214a5c",
+  "role": "hero",
+  "rotations": {
+    "south": "assets/characters/guan-yu/base/south.png",
+    "east": "assets/characters/guan-yu/base/east.png",
+    "north": "assets/characters/guan-yu/base/north.png",
+    "west": "assets/characters/guan-yu/base/west.png"
+  },
+  "icon_96": "assets/characters/guan-yu/icon/south-96.png",
+  "animations": {
+    "idle": {
+      "south": "assets/characters/guan-yu/animations/idle-south.gif",
+      "east": "assets/characters/guan-yu/animations/idle-east.gif",
+      "north": "assets/characters/guan-yu/animations/idle-north.gif",
+      "west": "assets/characters/guan-yu/animations/idle-west.gif"
+    },
+    "walk": {
+      "south": "assets/characters/guan-yu/animations/walk-south.gif",
+      "east": "assets/characters/guan-yu/animations/walk-east.gif",
+      "north": "assets/characters/guan-yu/animations/walk-north.gif",
+      "west": "assets/characters/guan-yu/animations/walk-west.gif"
+    },
+    "attack": {
+      "south": "assets/characters/guan-yu/animations/attack-south.gif",
+      "east": "assets/characters/guan-yu/animations/attack-east.gif",
+      "north": "assets/characters/guan-yu/animations/attack-north.gif",
+      "west": "assets/characters/guan-yu/animations/attack-west.gif"
+    },
+    "hit": {
+      "south": "assets/characters/guan-yu/animations/hit-south.gif",
+      "east": "assets/characters/guan-yu/animations/hit-east.gif",
+      "north": "assets/characters/guan-yu/animations/hit-north.gif",
+      "west": "assets/characters/guan-yu/animations/hit-west.gif"
+    }
+  }
+}

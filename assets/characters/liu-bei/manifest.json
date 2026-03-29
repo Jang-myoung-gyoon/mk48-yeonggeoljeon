@@ -1,0 +1,38 @@
+{
+  "sprite_id": "liu-bei",
+  "character_id": "3058232d-13c7-4663-8502-82e74af3e864",
+  "role": "hero",
+  "rotations": {
+    "south": "assets/characters/liu-bei/base/south.png",
+    "east": "assets/characters/liu-bei/base/east.png",
+    "north": "assets/characters/liu-bei/base/north.png",
+    "west": "assets/characters/liu-bei/base/west.png"
+  },
+  "icon_96": "assets/characters/liu-bei/icon/south-96.png",
+  "animations": {
+    "idle": {
+      "south": "assets/characters/liu-bei/animations/idle-south.gif",
+      "east": "assets/characters/liu-bei/animations/idle-east.gif",
+      "north": "assets/characters/liu-bei/animations/idle-north.gif",
+      "west": "assets/characters/liu-bei/animations/idle-west.gif"
+    },
+    "walk": {
+      "south": "assets/characters/liu-bei/animations/walk-south.gif",
+      "east": "assets/characters/liu-bei/animations/walk-east.gif",
+      "north": "assets/characters/liu-bei/animations/walk-north.gif",
+      "west": "assets/characters/liu-bei/animations/walk-west.gif"
+    },
+    "attack": {
+      "south": "assets/characters/liu-bei/animations/attack-south.gif",
+      "east": "assets/characters/liu-bei/animations/attack-east.gif",
+      "north": "assets/characters/liu-bei/animations/attack-north.gif",
+      "west": "assets/characters/liu-bei/animations/attack-west.gif"
+    },
+    "hit": {
+      "south": "assets/characters/liu-bei/animations/hit-south.gif",
+      "east": "assets/characters/liu-bei/animations/hit-east.gif",
+      "north": "assets/characters/liu-bei/animations/hit-north.gif",
+      "west": "assets/characters/liu-bei/animations/hit-west.gif"
+    }
+  }
+}

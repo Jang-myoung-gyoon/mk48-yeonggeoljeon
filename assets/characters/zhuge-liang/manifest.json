@@ -1,0 +1,38 @@
+{
+  "sprite_id": "zhuge-liang",
+  "character_id": "b731f9e2-ecbb-43a6-8520-cfb608ad95f5",
+  "role": "hero",
+  "rotations": {
+    "south": "assets/characters/zhuge-liang/base/south.png",
+    "east": "assets/characters/zhuge-liang/base/east.png",
+    "north": "assets/characters/zhuge-liang/base/north.png",
+    "west": "assets/characters/zhuge-liang/base/west.png"
+  },
+  "icon_96": "assets/characters/zhuge-liang/icon/south-96.png",
+  "animations": {
+    "idle": {
+      "south": "assets/characters/zhuge-liang/animations/idle-south.gif",
+      "east": "assets/characters/zhuge-liang/animations/idle-east.gif",
+      "north": "assets/characters/zhuge-liang/animations/idle-north.gif",
+      "west": "assets/characters/zhuge-liang/animations/idle-west.gif"
+    },
+    "walk": {
+      "south": "assets/characters/zhuge-liang/animations/walk-south.gif",
+      "east": "assets/characters/zhuge-liang/animations/walk-east.gif",
+      "north": "assets/characters/zhuge-liang/animations/walk-north.gif",
+      "west": "assets/characters/zhuge-liang/animations/walk-west.gif"
+    },
+    "attack": {
+      "south": "assets/characters/zhuge-liang/animations/attack-south.gif",
+      "east": "assets/characters/zhuge-liang/animations/attack-east.gif",
+      "north": "assets/characters/zhuge-liang/animations/attack-north.gif",
+      "west": "assets/characters/zhuge-liang/animations/attack-west.gif"
+    },
+    "hit": {
+      "south": "assets/characters/zhuge-liang/animations/hit-south.gif",
+      "east": "assets/characters/zhuge-liang/animations/hit-east.gif",
+      "north": "assets/characters/zhuge-liang/animations/hit-north.gif",
+      "west": "assets/characters/zhuge-liang/animations/hit-west.gif"
+    }
+  }
+}
